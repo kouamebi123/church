@@ -1,0 +1,18 @@
+
+# === Backend specific ===
+backend/node_modules/
+backend/dist/
+backend/.env.local
+backend/coverage/
+
+
+# === Frontend fallback (au cas où) ===
+frontend/coverage/
+frontend/node_modules/
+frontend/build/
+
+# === IDE / OS files ===
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
