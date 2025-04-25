@@ -24,6 +24,8 @@ import {
   FormControl,
   InputLabel,
   Select,
+  Snackbar,
+  Alert,
   MenuItem as MuiMenuItem
 } from '@mui/material';
 import {
@@ -35,6 +37,9 @@ import { useNavigate } from 'react-router-dom';
 import * as Yup from 'yup';
 import { useFormik } from 'formik';
 import { TYPES_CULTE } from '../../constants/enums';
+import ErrorMessage from '../../components/ErrorMessage';
+import DeleteConfirmDialog from '../../components/DeleteConfirmDialog';
+import Loading from '../../components/Loading';
 
 const API_URL = process.env.REACT_APP_API_URL+ '/api';
 
@@ -66,6 +71,9 @@ const ServicesList = () => {
   const [editService, setEditService] = useState(null);
   const [collecteurs, setCollecteurs] = useState([]);
   const [superviseurs, setSuperviseurs] = useState([]);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [serviceToDelete, setServiceToDelete] = useState(null);
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
   const [filter, setFilter] = useState({
     type: '',
     date: '',
@@ -73,22 +81,27 @@ const ServicesList = () => {
     superviseur: ''
   });
 
-  useEffect(() => {
-    const fetchServices = async () => {
-      try {
-        const response = await axios.get(`${API_URL}/services`, {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
-        setServices(response.data.data);
-        setLoading(false);
-      } catch (err) {
-        setError(err.message);
-        setLoading(false);
-      }
-    };
+  const handleCloseDeleteDialog = () => {
+    setDeleteDialogOpen(false);
+    setServiceToDelete(null);
+  };
 
+  const fetchServices = async () => {
+    try {
+      const response = await axios.get(`${API_URL}/services`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      setServices(response.data.data);
+      setLoading(false);
+    } catch (err) {
+      setError(err.message);
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     fetchServices();
   }, [token]);
 
@@ -122,7 +135,6 @@ const ServicesList = () => {
     
     // Pré-remplir le formulaire avec les données du service
     formik.setValues({
-      identifiant_culte: service.identifiant_culte,
       culte: service.culte,
       orateur: service.orateur,
       date: service.date,
@@ -160,15 +172,16 @@ const ServicesList = () => {
       ));
 
       handleEditClose();
+      setSnackbar({ open: true, message: 'Service modifié avec succès', severity: 'success' });
+      fetchServices();
     } catch (error) {
       console.error('Erreur lors de la mise à jour du service:', error);
-      alert('Erreur lors de la mise à jour du service');
+      setSnackbar({ open: true, message: 'Erreur lors de la mise à jour du service', severity: 'error' });
     }
   };
 
   const formik = useFormik({
     initialValues: {
-      identifiant_culte: '',
       culte: '',
       orateur: '',
       date: new Date(),
@@ -221,27 +234,36 @@ const ServicesList = () => {
     setPage(0);
   };
 
-  const handleDeleteService = async (serviceId) => {
-    if (window.confirm('Êtes-vous sûr de vouloir supprimer ce service ?')) {
-      try {
-        await axios.delete(`${API_URL}/services/${serviceId}`, {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
-        setServices(services.filter(service => service._id !== serviceId));
-      } catch (error) {
-        console.error('Erreur lors de la suppression du service:', error);
-        alert('Erreur lors de la suppression du service');
-      }
+  const handleOpenDeleteDialog = (service) => {
+    setServiceToDelete(service);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleConfirmDeleteService = async () => {
+    if (!serviceToDelete) return;
+    try {
+      await axios.delete(`${API_URL}/services/${serviceToDelete._id}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      setServices(services.filter(service => service._id !== serviceToDelete._id));
+      setSnackbar({ open: true, message: 'Service supprimé avec succès', severity: 'success' });
+    } catch (error) {
+      console.error('Erreur lors de la suppression du service:', error);
+      setSnackbar({ open: true, message: 'Erreur lors de la suppression du service', severity: 'error' });
+    } finally {
+      handleCloseDeleteDialog();
     }
   };
 
-  if (loading) return <div>Chargement...</div>;
-  if (error) return <div>Erreur: {error}</div>;
+  
+
+  if (loading) return <Loading titre="Chargement des données des services" />;
+  if (error) return <ErrorMessage message={error} />;
 
   return (
-    <Paper elevation={3} sx={{ p: 4 }}>
+    <Paper data-aos="fade-up" elevation={3} sx={{ p: 4 }}>
         
         {/* Filtres */}
         <Box mb={4}>
@@ -290,11 +312,10 @@ const ServicesList = () => {
         </Box>
 
         {/* Tableau */}
-        <TableContainer component={Paper} sx={{ backgroundColor: 'primary.light' }}>
+        <TableContainer component={Paper} sx={{ backgroundColor: 'primary.light', maxHeight: '80vh', overflow: 'auto' }}>
           <Table sx={{ backgroundColor: '#fff' }}>
             <TableHead sx={{ backgroundColor: '#dcdcdc' }}>
               <TableRow>
-                <TableCell sx={{ fontWeight: 'bold' }}>Identifiant</TableCell>
                 <TableCell sx={{ fontWeight: 'bold' }}  >Type de Culte</TableCell>
                 <TableCell sx={{ fontWeight: 'bold' }}>Orateur</TableCell>
                 <TableCell sx={{ fontWeight: 'bold' }}>Date</TableCell>
@@ -325,7 +346,6 @@ const ServicesList = () => {
                         }
                     }}
                   >
-                    <TableCell>{service.identifiant_culte}</TableCell>
                     <TableCell>{service.culte}</TableCell>
                     <TableCell>{service.orateur}</TableCell>
                     <TableCell>
@@ -352,7 +372,7 @@ const ServicesList = () => {
                       </IconButton>
                       <IconButton 
                         color="error"
-                        onClick={() => handleDeleteService(service._id)}
+                        onClick={() => handleOpenDeleteDialog(service)}
                       >
                         <DeleteIcon />
                       </IconButton>
@@ -550,6 +570,27 @@ const ServicesList = () => {
             </DialogActions>
           </form>
         </Dialog>
+
+        {/* Dialog de confirmation suppression service */}
+      <DeleteConfirmDialog
+        open={deleteDialogOpen}
+        title="Supprimer le service"
+        content={serviceToDelete ? `Êtes-vous sûr de vouloir supprimer le service du ${format(new Date(serviceToDelete.date), 'dd/MM/yyyy', { locale: fr })} ?` : "Êtes-vous sûr de vouloir supprimer ce service ?"}
+        onClose={handleCloseDeleteDialog}
+        onConfirm={handleConfirmDeleteService}
+      />
+
+         {/* Snackbar feedback actions membres */}
+              <Snackbar
+                open={snackbar.open}
+                autoHideDuration={2000}
+                onClose={() => setSnackbar({ ...snackbar, open: false })}
+                anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+              >
+                <Alert onClose={() => setSnackbar({ ...snackbar, open: false })} severity={snackbar.severity} sx={{ width: '100%' }}>
+                  {snackbar.message}
+                </Alert>
+              </Snackbar>
 
         <TablePagination
           component="div"

@@ -125,7 +125,7 @@ exports.deleteDepartment = async (req, res) => {
             { departement: null }
         );
 
-        await department.remove();
+        await department.deleteOne();
 
         res.status(200).json({
             success: true,

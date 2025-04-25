@@ -56,6 +56,59 @@ exports.getUser = async (req, res) => {
     }
 };
 
+// @desc    Obtenir les membres non isolés
+// @route   GET /api/users/non-isoles
+// @access  Private/Admin
+exports.getIsoles = async (req, res) => {
+    try {
+        const usersInGroups = await Group.distinct('members');
+        const specialQualifications = ['Responsable réseau', 'Gouvernance', 'Ecodim', 'Responsable ecodim'];
+        const users = await User.find({
+            _id: { $nin: usersInGroups },
+            qualification: { $nin: specialQualifications }
+        })
+            .populate('eglise_locale', 'nom')
+            .populate('departement', 'nom')
+            .select('-password');
+        res.status(200).json({
+            success: true,
+            count: users.length,
+            data: users
+        });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: error.message
+        });
+    }
+};
+
+exports.getNonIsoles = async (req, res) => {
+    try {
+        const usersInGroups = await Group.distinct('members');
+        const specialQualifications = ['Responsable réseau', 'Gouvernance', 'Ecodim', 'Responsable ecodim'];
+        const users = await User.find({
+            $or: [
+                { _id: { $in: usersInGroups } },
+                { qualification: { $in: specialQualifications } }
+            ]
+        })
+            .populate('eglise_locale', 'nom')
+            .populate('departement', 'nom')
+            .select('-password');
+        res.status(200).json({
+            success: true,
+            count: users.length,
+            data: users
+        });
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: error.message
+        });
+    }
+};
+
 // @desc    Créer un utilisateur
 // @route   POST /api/users
 // @access  Private/Admin
@@ -123,7 +176,7 @@ exports.deleteUser = async (req, res) => {
             });
         }
 
-        await user.remove();
+        await user.deleteOne();
 
         res.status(200).json({
             success: true,
@@ -237,6 +290,68 @@ exports.getUserStats = async (req, res) => {
             success: false,
             message: error.message
         });
+    }
+};
+
+// @desc    Obtenir les membres retirés des groupes (avec historique)
+// @route   GET /api/users/retired
+// @access  Private/Admin
+exports.getRetiredUsers = async (req, res) => {
+    try {
+        // 1. Récupère tous les groupes avec historique et responsables peuplés
+        const groups = await Group.find().populate('network', 'nom').populate('responsable1', 'username').populate('responsable2', 'username');
+        // 2. Map pour stocker pour chaque user son dernier leftAt
+        const retiredMap = new Map();
+        groups.forEach(group => {
+            if (Array.isArray(group.membersHistory)) {
+                group.membersHistory.forEach(hist => {
+                    if (hist.leftAt) {
+                        // Si pas encore dans la map ou leftAt plus récent, on remplace
+                        const prev = retiredMap.get(hist.user?.toString());
+                        if (!prev || new Date(hist.leftAt) > new Date(prev.leftAt)) {
+                            retiredMap.set(hist.user?.toString(), {
+                                user: hist.user,
+                                leftAt: hist.leftAt,
+                                group: {
+                                    _id: group._id,
+                                    nom: group.responsable1 ? (
+                                        group.responsable2
+                                            ? `GR ${group.responsable1.username.split(' ')[0]} & ${group.responsable2.username.split(' ')[0]}`
+                                            : `GR ${group.responsable1.username.split(' ')[0]}`
+                                    ) : null
+                                },
+                                network: group.network
+                            });
+                        }
+                    }
+                });
+            }
+        });
+        // 3. Exclure les utilisateurs qui sont encore membres d'au moins un groupe
+        const allRetiredUserIds = Array.from(retiredMap.keys());
+        // Cherche tous les users qui sont encore membres d'au moins un groupe
+        const groupsWithMembers = await Group.find({ members: { $in: allRetiredUserIds } }).select('members');
+        const stillInGroupUserIds = new Set();
+        groupsWithMembers.forEach(gr => {
+            gr.members.forEach(m => stillInGroupUserIds.add(m.toString()));
+        });
+        // Filtre les users qui ne sont plus dans aucun groupe
+        const trulyRetiredUserIds = allRetiredUserIds.filter(uid => !stillInGroupUserIds.has(uid));
+        const allAvailableUsers = await User.find({ _id: { $in: trulyRetiredUserIds } })
+            .select('-password');
+        // 4. Pour chaque user, on complète avec infos groupe/réseau
+        const result = allAvailableUsers.map(u => {
+            const hist = retiredMap.get(u._id.toString());
+            return {
+                user: u,
+                leftAt: hist.leftAt,
+                group: hist.group,
+                network: hist.network
+            };
+        });
+        res.status(200).json({ success: true, data: result });
+    } catch (error) {
+        res.status(500).json({ success: false, message: error.message });
     }
 };
 

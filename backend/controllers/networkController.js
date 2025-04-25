@@ -190,7 +190,7 @@ exports.deleteNetwork = async (req, res) => {
             );
         }
 
-        await network.remove();
+        await network.deleteOne();
 
         res.status(200).json({
             success: true,
@@ -284,9 +284,16 @@ exports.getNetworkStats = async (req, res) => {
 
         const stats = await Promise.all(
             networks.map(async (network) => {
-                // Récupère tous les groupes du réseau
-                const groups = await Group.find({ network: network._id }).select('members');
-                
+                // Récupère tous les groupes du réseau avec leurs responsables
+                const groups = await Group.find({ network: network._id }).select('members responsable1 responsable2');
+
+                // Compte le nombre total de responsables de groupes pour ce réseau
+                let groupResponsablesCount = 0;
+                groups.forEach(gr => {
+                  if (gr.responsable1) groupResponsablesCount++;
+                  if (gr.responsable2) groupResponsablesCount++;
+                });
+
                 // Récupère tous les membres (sans doublons)
                 const memberIds = new Set();
                 groups.forEach(g => {
@@ -321,8 +328,10 @@ exports.getNetworkStats = async (req, res) => {
                             qualification: network.responsable2.qualification
                         } : null
                     ].filter(Boolean),
-                    qualifications: qualifications.map(q => q.qualification)
+                    qualifications: qualifications.map(q => q.qualification),
+                    groupResponsablesCount
                 };
+
             })
         );
 

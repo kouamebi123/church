@@ -10,17 +10,24 @@ const {
     updateQualification,
     getUserStats,
     getAvailableUsers,
-    resetPassword
+    getRetiredUsers,
+    resetPassword,
+    getNonIsoles,
+    getIsoles
 } = require('../controllers/userController');
 
 router.use(protect);
 router.use(authorize('admin'));
+
+router.get('/non-isoles', getNonIsoles);
+router.get('/isoles', getIsoles);
 
 router.route('/')
     .get(getUsers)
     .post(createUser);
 
 router.get('/available', getAvailableUsers);
+router.get('/retired', getRetiredUsers);
 router.get('/stats', getUserStats);
 
 router.route('/:id')

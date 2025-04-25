@@ -56,14 +56,10 @@ exports.getService = async (req, res) => {
 // @access  Private/Collecteur
 exports.createService = async (req, res) => {
     try {
-        // Générer l'identifiant unique du culte
-        const date = new Date(req.body.date);
-        const timestamp = Date.now();
-        const identifiant = `CULTE-${date.getFullYear()}${(date.getMonth() + 1).toString().padStart(2, '0')}${date.getDate().toString().padStart(2, '0')}-${timestamp}`;
-        
+        console.log('Payload reçu backend:', req.body);
+        // Créer le service avec les données reçues
         const service = await Service.create({
-            ...req.body,
-            identifiant_culte: identifiant
+            ...req.body
         });
 
         const populatedService = await Service.findById(service._id)
@@ -122,7 +118,7 @@ exports.updateService = async (req, res) => {
 // @access  Private/Admin
 exports.deleteService = async (req, res) => {
     try {
-        const service = await Service.findById(req.params.id);
+        const service = await Service.findByIdAndDelete(req.params.id);
 
         if (!service) {
             return res.status(404).json({
@@ -130,8 +126,6 @@ exports.deleteService = async (req, res) => {
                 message: 'Service non trouvé'
             });
         }
-
-        await service.remove();
 
         res.status(200).json({
             success: true,
@@ -203,24 +197,42 @@ exports.getServiceStats = async (req, res) => {
 exports.getServicesByPeriod = async (req, res) => {
     try {
         const { start, end } = req.query;
+
         
+        // Correction : ignorer l'heure, ne comparer que la date (jour/mois/année)
+        // start = YYYY-MM-DD, end = YYYY-MM-DD, on veut inclure tout le dernier jour
+        const startDate = new Date(start);
+        startDate.setHours(0,0,0,0);
+        const endDate = new Date(end);
+        endDate.setHours(23,59,59,999);
         const query = {
             date: {
-                $gte: new Date(start),
-                $lte: new Date(end)
+                $gte: startDate,
+                $lte: endDate
             }
         };
 
-        const services = await Service.find(query)
-            .populate('collecteur_culte', '_id username')
-            .populate('superviseur', '_id username')
-            .sort('date');
+        // DEBUG : afficher tous les services existants (sans filtre)
+        // Récupérer tous les services (tous les champs)
+        const allServices = await Service.find({});
+        //console.log('ALL SERVICES IN DB:', allServices);
+
+        // Filtrage JS robuste : on ne compare que l'année, le mois, le jour (ignore l'heure/fuseau)
+        const startStr = startDate.toISOString().slice(0,10);
+        const endStr = endDate.toISOString().slice(0,10);
+        const filtered = allServices.filter(s => {
+            const d = s.date.toISOString().slice(0,10);
+            return d >= startStr && d <= endStr;
+        });
+
+        console.log('services (après filtre JS jour):', startStr, endStr);
 
         res.status(200).json({
             success: true,
-            count: services.length,
-            data: services
+            count: filtered.length,
+            data: filtered
         });
+
     } catch (error) {
         res.status(500).json({
             success: false,

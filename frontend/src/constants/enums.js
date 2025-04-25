@@ -15,6 +15,7 @@ export const TRANCHE_AGE_OPTIONS = [
   { value: '85 ans et plus', label: '85 ans et plus' }
 ];
 
+
 export const SITUATION_MATRIMONIALE_OPTIONS = [
   { value: 'Célibataire', label: 'Célibataire' },
   { value: 'Marié(e)', label: 'Marié(e)' },
@@ -49,6 +50,16 @@ export const QUALIFICATION_OPTIONS = [
 export const TYPES_CULTE = [
   { value: 'Tous', label: 'Tous' },
   { value: 'Culte du dimanche', label: 'Culte du dimanche' },
+  { value: 'Culte de prière', label: 'Culte de prière' },
+  { value: 'Culte spécial', label: 'Culte spécial' },
+  { value: 'Culte de jeûne', label: 'Culte de jeûne' },
+  { value: 'Autre', label: 'Autre' }
+];
+
+export const TYPES_CULTE_OPTIONS = [
+  { value: 'Culte 1', label: 'Culte 1' },
+  { value: 'Culte 2', label: 'Culte 2' },
+  { value: 'Culte 3', label: 'Culte 3' },
   { value: 'Culte de prière', label: 'Culte de prière' },
   { value: 'Culte spécial', label: 'Culte spécial' },
   { value: 'Culte de jeûne', label: 'Culte de jeûne' },

@@ -39,6 +39,7 @@ import {
 import Navbar from '../../components/Navbar';
 import { GENRE_OPTIONS, TRANCHE_AGE_OPTIONS, SITUATION_MATRIMONIALE_OPTIONS, NIVEAU_EDUCATION_OPTIONS, QUALIFICATION_OPTIONS } from '../../constants/enums';
 import { COUNTRIES } from '../../constants/countries';
+import ErrorMessage from '../../components/ErrorMessage';
 
 const StyledCard = styled(Card)(({ theme }) => ({
   height: '100%',
@@ -70,6 +71,7 @@ function NetworkDetails() {
   // Hooks pour charger dynamiquement les églises et départements
   const [churches, setChurches] = useState([]);
   const [departments, setDepartments] = useState([]);
+  const [error, setError] = useState(null);
 
   const API_URL = process.env.REACT_APP_API_URL + '/api';
 
@@ -150,7 +152,7 @@ function NetworkDetails() {
     available_users: []
   });
   const [loading, setLoading] = useState(true);
-  
+
 
   // Récupération dynamique de l'ID du réseau depuis l'URL
   const { id: networkId } = useParams();
@@ -159,7 +161,7 @@ function NetworkDetails() {
   const fetchData = async () => {
     const token = localStorage.getItem('token');
     //setLoading(true);
-    
+
     try {
       // Adapte les URLs à ton backend
       const reseauRes = await axios.get(`${API_URL}/networks/${networkId}`);
@@ -175,7 +177,7 @@ function NetworkDetails() {
         available_users: Array.isArray(availableUsersRes.data.data) ? availableUsersRes.data.data : []
       });
     } catch (err) {
-      setSnackbar({ open: true, message: "Erreur lors du chargement des données réseau", severity: 'error' });
+      setError("Erreur lors du chargement des données réseau");
     } finally {
       setLoading(false);
     }
@@ -403,6 +405,7 @@ function NetworkDetails() {
   };
 
   if (loading) return <Loading titre="Chargement des données du réseau" />;
+  if (error) return <ErrorMessage error={error} />;
 
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
@@ -422,7 +425,7 @@ function NetworkDetails() {
           </Box>
         </Box>
         {/* Section Responsables */}
-        <Paper sx={{ p: 3, mb: 4 }}>
+        <Paper data-aos="fade-up" sx={{ p: 3, mb: 4 }}>
           <Typography variant="h5" gutterBottom>
             Responsable{networkData.reseau.responsable2?.username ? 's' : ''} du Réseau
           </Typography>
@@ -451,7 +454,7 @@ function NetworkDetails() {
         </Paper>
 
         {/* Section Statistiques */}
-        <Paper sx={{ p: 3, mb: 4 }}>
+        <Paper data-aos="fade-up" sx={{ p: 3, mb: 4 }}>
           <Typography variant="h5" gutterBottom>Statistiques du Réseau</Typography>
           <Grid container spacing={2}>
             {Object.entries(networkData.stats || {})
@@ -488,7 +491,7 @@ function NetworkDetails() {
         </Paper>
 
         {/* Section GR */}
-        <Box sx={{ mb: 4 }}>
+        <Box data-aos="fade-up" sx={{ mb: 4 }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
             <Typography variant="h5">Groupes de Réveil</Typography>
             {(user?.role === 'admin' || user?.role === 'superviseur') && (
@@ -504,7 +507,7 @@ function NetworkDetails() {
 
           <Grid container spacing={3}>
             {(Array.isArray(networkData.grs) ? networkData.grs : []).map((gr) => (
-              <Grid item xs={12} md={6} key={gr.id}>
+              <Grid data-aos="fade-up" item xs={12} md={6} key={gr.id}>
                 <StyledCard>
                   <CardContent>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
@@ -1195,17 +1198,17 @@ function NetworkDetails() {
         onConfirm={handleConfirmDeleteMember}
       />
 
-  {/* Snackbar feedback actions membres */}
-            <Snackbar
-                open={snackbar.open}
-                autoHideDuration={2000}
-                onClose={() => setSnackbar({ ...snackbar, open: false })}
-                anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-            >
-                <Alert onClose={() => setSnackbar({ ...snackbar, open: false })} severity={snackbar.severity} sx={{ width: '100%' }}>
-                    {snackbar.message}
-                </Alert>
-            </Snackbar>
+      {/* Snackbar feedback actions membres */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={2000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert onClose={() => setSnackbar({ ...snackbar, open: false })} severity={snackbar.severity} sx={{ width: '100%' }}>
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
 
 
     </Box>

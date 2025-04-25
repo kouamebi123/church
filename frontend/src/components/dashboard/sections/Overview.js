@@ -53,7 +53,7 @@ const Overview = () => {
                 <Typography variant="h5" gutterBottom>
                     Statistiques détaillées
                 </Typography>
-                <Grid container spacing={3}>
+                <Grid data-aos="fade-up" container spacing={3}>
                     {[
                         { label: 'Réguliers', value: stats.total_reguliers },
                         { label: 'En intégration', value: stats.total_integration },

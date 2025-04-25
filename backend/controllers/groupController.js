@@ -61,7 +61,6 @@ exports.getGroup = async (req, res) => {
 // @access  Private/Admin
 exports.createGroup = async (req, res) => {
     try {
-        console.log('BODY:', req.body);
         const { network, responsable1, responsable2, members } = req.body;
 
         // Vérifier si le réseau existe
@@ -127,7 +126,7 @@ exports.createGroup = async (req, res) => {
 // @route   PUT /api/groups/:id
 // @access  Private/Admin
 exports.updateGroup = async (req, res) => {
-    console.log('Payload reçu pour updateGroup:', req.body);
+    //console.log('Payload reçu pour updateGroup:', req.body);
     try {
         // 1. Récupérer les anciens responsables
         const oldGroup = await Group.findById(req.params.id);
@@ -282,7 +281,7 @@ exports.addMember = async (req, res) => {
         // Ajoute le membre si pas déjà présent
         if (!group.members.includes(userId)) {
             group.members.push(userId);
-            group.membersHistory.push({ user: userId, joinedAt: new Date('2025-04-01T00:00:00Z'), leftAt: null });
+            group.membersHistory.push({ user: userId, joinedAt: new Date(), leftAt: null });
         }
         await group.save();
 

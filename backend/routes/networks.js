@@ -12,6 +12,7 @@ const {
     getNetworkGroups,
     getNetworkMembers
 } = require('../controllers/networkController');
+const { getNetworksQualificationStats } = require('../controllers/networkController.qualificationStats');
 
 router.use(protect);
 
@@ -20,6 +21,7 @@ router.route('/')
     .post(authorize('admin'), createNetwork);
 
 router.get('/stats', authorize('admin'), getNetworkStats);
+router.get('/qualification-stats', authorize('admin'), getNetworksQualificationStats);
 
 router.get('/:id/stats', getNetworkStatsById);
 router.get('/:id/grs', getNetworkGroups);

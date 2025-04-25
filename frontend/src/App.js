@@ -10,13 +10,17 @@ import './App.css'
 
 import store from './app/store';
 import theme from './theme';
+import Login from './pages/auth/Login';
+import Register from './pages/auth/Register';
+import NoFound from './pages/NoFound';
 import RequireAuth from './components/auth/RequireAuth';
 import RedirectIfAuth from './components/auth/RedirectIfAuth';
 import Layout from './components/layout/Layout';
+import Loading from './components/Loading';
+import AOS from 'aos';
+import 'aos/dist/aos.css';
 
 // Lazy loading des pages
-const Login = React.lazy(() => import('./pages/auth/Login'));
-const Register = React.lazy(() => import('./pages/auth/Register'));
 const Home = React.lazy(() => import('./pages/Home'));
 const Profile = React.lazy(() => import('./pages/Profile'));
 
@@ -43,6 +47,12 @@ function AppContent() {
       dispatch(getMe());
     }
   }, [dispatch]);
+
+  React.useEffect(() => {
+    AOS.init({
+      duration: 1000, // Durée de l'animation en ms
+    });
+  }, []);
 
   return (
     <Routes>
@@ -101,6 +111,7 @@ function AppContent() {
           <Dashboard />
         </RequireAuth>
       } />
+      <Route path="*" element={<NoFound />} />
     </Routes>
   );
 }
@@ -112,7 +123,7 @@ function App() {
         <CssBaseline />
         <Router>
           <Layout>
-            <React.Suspense fallback={<div>Loading...</div>}>
+            <React.Suspense fallback={<Loading titre="Chargement" />}>
               <AppContent />
             </React.Suspense>
             <ToastContainer position="top-right" autoClose={5000} />

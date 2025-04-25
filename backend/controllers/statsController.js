@@ -16,6 +16,7 @@ exports.getGlobalStats = async (req, res) => {
       if (gr.responsable1) total_resp_gr += 1;
       if (gr.responsable2) total_resp_gr += 1;
     });
+    const total_leaders = await User.countDocuments({ qualification: 'Leader' });
     const total_leaders_all = await User.countDocuments({ qualification: { $in: ['Leader', 'Responsable réseau', '12', '144', '1728'] } });
     const total_reguliers = await User.countDocuments({ qualification: 'Régulier' });
     const total_integration = await User.countDocuments({ qualification: 'En intégration' });
@@ -23,14 +24,12 @@ exports.getGlobalStats = async (req, res) => {
     const total_gouvernance = await User.countDocuments({ qualification: 'Gouvernance' });
     const total_ecodim = await User.countDocuments({ qualification: 'Ecodim' });
     const total_resp_ecodim = await User.countDocuments({ qualification: 'Responsable ecodim' });
-    const total_all = await User.countDocuments();
-
-    // Calcul des personnes isolées
     const usersInGroups = await Group.distinct('members');
     const total_personnes_isolees = await User.countDocuments({
       _id: { $nin: usersInGroups },
       qualification: { $nin: ['Responsable réseau', 'Gouvernance', 'Ecodim', 'Responsable ecodim'] }
     });
+    const total_all = await User.countDocuments() - total_personnes_isolees;
 
     res.json({
       total_gouvernance,
@@ -38,6 +37,7 @@ exports.getGlobalStats = async (req, res) => {
       total_resp_reseaux,
       total_gr,
       total_resp_gr,
+      total_leaders,
       total_leaders_all,
       total_reguliers,
       total_integration,
@@ -57,8 +57,6 @@ exports.getGlobalStats = async (req, res) => {
 // @access  Private
 exports.getNetworksEvolution = async (req, res) => {
   try {
-    const Network = require('../models/Network');
-    const Group = require('../models/Group');
 
     // Récupère tous les réseaux
     const networks = await Network.find();
@@ -73,7 +71,6 @@ exports.getNetworksEvolution = async (req, res) => {
       months.push(month);
     }
 
-    console.log(months)
     // La boucle ci-dessus garantit déjà 12 mois glissants, du mois il y a 11 mois jusqu'au mois en cours.
 
 
@@ -149,18 +146,15 @@ exports.compareNetworksByYear = async (req, res) => {
         const endOfYear = dates[i];
         const groups = await Group.find({
           network: network._id,
-            
+
         }).select('membersHistory');
         const memberIds = new Set();
         groups.forEach(g => {
           if (Array.isArray(g.membersHistory)) {
             g.membersHistory.forEach(m => {
-  const joinedAt = new Date(m.joinedAt);
-  const leftAt = m.leftAt ? new Date(m.leftAt) : null;
-  // DEBUG LOG
-  console.log(`network: ${network.nom}, year: ${years.split(',')[i]}, endOfYear: ${endOfYear.toISOString()}, joinedAt: ${joinedAt.toISOString()}, leftAt: ${leftAt ? leftAt.toISOString() : 'null'}`);
-  console.log('Condition:', joinedAt <= endOfYear && (!leftAt || leftAt > endOfYear));
-  if (joinedAt <= endOfYear && (!leftAt || leftAt > endOfYear)) {
+              const joinedAt = new Date(m.joinedAt);
+              const leftAt = m.leftAt ? new Date(m.leftAt) : null;
+              if (joinedAt <= endOfYear && (!leftAt || leftAt > endOfYear)) {
                 memberIds.add(m.user.toString());
               }
             });
@@ -176,7 +170,6 @@ exports.compareNetworksByYear = async (req, res) => {
       success: true,
       data: result
     });
-    console.log(result);
   } catch (error) {
     res.status(500).json({
       success: false,

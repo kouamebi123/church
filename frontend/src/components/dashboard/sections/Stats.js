@@ -1,17 +1,18 @@
 import { useState, useEffect } from 'react';
 import { Box, Typography, Grid, CircularProgress, Paper } from '@mui/material';
 import { ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, LineChart, Line } from 'recharts';
+import ErrorMessage from '../../../components/ErrorMessage';
 
 const Stats = () => {
 
     // Palette étendue pour des couleurs bien distinctes
     const COLORS = [
         '#e6194b', '#3cb44b', '#ffe119', '#4363d8', '#f58231',
-  '#911eb4', '#46f0f0', '#f032e6', '#bcf60c', '#fabebe',
-  '#008080', '#e6beff', '#9a6324', '#fffac8', '#800000',
-  '#aaffc3', '#808000', '#ffd8b1', '#000075', '#808080',
-  '#ffffff', '#000000', '#a28ef5', '#ffb6b9', '#00c49f',
-  '#0088fe', '#ffc658', '#ff8042', '#7b68ee', '#f0e130'
+        '#911eb4', '#46f0f0', '#f032e6', '#bcf60c', '#fabebe',
+        '#008080', '#e6beff', '#9a6324', '#fffac8', '#800000',
+        '#aaffc3', '#808000', '#ffd8b1', '#000075', '#808080',
+        '#ffffff', '#000000', '#a28ef5', '#ffb6b9', '#00c49f',
+        '#0088fe', '#ffc658', '#ff8042', '#7b68ee', '#f0e130'
     ];
 
     const [stats, setStats] = useState({});
@@ -36,12 +37,14 @@ const Stats = () => {
                 if (res.ok) setStats(data);
             } catch (err) {
                 // Optionnel : afficher une erreur si besoin
+            } finally {
+                setStatsLoading(false);
             }
         };
         fetchGlobalStats();
     }, [API_URL]);
 
-    
+
     const currentYear = new Date().getFullYear();
     const lastYear = currentYear - 1;
     // Fonction pour charger les statistiques
@@ -50,12 +53,12 @@ const Stats = () => {
         // Comparaison annuelle réseaux (année précédente vs année en cours)
         try {
             const token = localStorage.getItem('token');
-            
+
             const resCompare = await fetch(`${API_URL}/stats/networks/evolution/compare?years=${lastYear},${currentYear}`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             const dataCompare = await resCompare.json();
-            console.log('Réponse brute comparaison annuelle:', dataCompare); // DEBUG
+            //console.log('Réponse brute comparaison annuelle:', dataCompare); // DEBUG
             if (!dataCompare || !dataCompare.data) {
                 setStatsError('Erreur: Données de comparaison annuelle absentes ou invalides.');
                 setNetworkYearCompare([]);
@@ -95,24 +98,24 @@ const Stats = () => {
             if (resEvolution.ok && dataEvolution.success) {
                 setNetworkEvolution(dataEvolution.data); // [{ month: '2025-01', Réseau1: 10, Réseau2: 20, ... }, ...]
             }
-            // 3. Fréquentation cultes (BarChart)
+            // 3. Fréquentation cultes (LineChart, 8 derniers dimanches)
+            // On demande uniquement les services du mois courant et des deux mois précédents
             const now = new Date();
-            const firstDay = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-            const lastDay = new Date(now.getFullYear(), now.getMonth(), 0);
-            const start = firstDay.toISOString().slice(0, 10);
-            const end = lastDay.toISOString().slice(0, 10);
+            const startMonth = new Date(now.getFullYear(), now.getMonth() - 2, 1); // Premier jour du mois il y a 2 mois
+            const endMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0); // Dernier jour du mois courant
+            const start = startMonth.toISOString().slice(0, 10);
+            const end = endMonth.toISOString().slice(0, 10);
             const resAttendance = await fetch(`${API_URL}/services/period?start=${start}&end=${end}`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             const dataAttendance = await resAttendance.json();
             if (resAttendance.ok && dataAttendance.success) {
-                setServiceAttendance(dataAttendance.data); // [{ date: '2025-03-02', adultes: 100, enfants: 30 }, ...]
+                setServiceAttendance(dataAttendance.data);
             }
             setStatsLoading(false);
         } catch (err) {
             setStatsError('Erreur lors du chargement des statistiques');
             setStatsLoading(false);
-            console.error(err);
         }
     };
 
@@ -126,15 +129,16 @@ const Stats = () => {
             {/* Bloc stats globales */}
             <Box sx={{ mb: 6 }}>
                 <Typography variant="h4" sx={{ mb: 2, fontWeight: 'bold', color: 'primary.main' }}>
-                    Statistiques
+                    Vue d'ensemble
                 </Typography>
-                <Grid container spacing={2} sx={{ mb: 3 }}>
+                <Grid data-aos="fade-up" container spacing={2} sx={{ mb: 3 }}>
                     {[
                         { value: stats.total_all, label: 'Membres' },
                         { value: stats.total_reseaux, label: 'Réseaux' },
                         { value: stats.total_gr, label: 'GR' },
                         { value: stats.total_resp_reseaux, label: 'Responsables Réseau' },
                         { value: stats.total_resp_gr, label: 'Responsables GR' },
+                        { value: stats.total_leaders, label: 'Leaders' },
                         { value: stats.total_leaders_all, label: 'Leaders (tous)' },
                         { value: stats.total_reguliers, label: 'Réguliers' },
                         { value: stats.total_integration, label: 'En intégration' },
@@ -153,13 +157,13 @@ const Stats = () => {
                     ))}
                 </Grid>
 
-                
+
                 {statsLoading ? (
                     <Box sx={{ display: 'flex', justifyContent: 'center', my: 4 }}><CircularProgress /></Box>
                 ) : statsError ? (
-                    <Typography color="error">{statsError}</Typography>
+                    <ErrorMessage error={statsError} />
                 ) : (
-                    <Grid container spacing={1} sx={{ display: 'block' }} >
+                    <Grid data-aos="fade-up" container spacing={1} sx={{ display: 'block' }} >
                         {/* PieChart - Répartition membres par réseau + Interprétation à droite */}
                         <Grid item xs={12} md={6} >
                             <Paper sx={{ p: 3, width: '100%', backgroundColor: '#f9f9f9', overflowX: 'auto', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
@@ -209,80 +213,80 @@ const Stats = () => {
                                         </ResponsiveContainer>
                                     </Box>
                                     <Box sx={{ bgcolor: '#f9f9f9', borderRadius: 2, border: '1px solid #e0e0e0', p: 4 }}>
-  {(() => {
-    const date = new Date();
-    const mois = date.toLocaleString('fr-FR', { month: 'long' });
-    const annee = date.getFullYear();
-    const jour = date.getDate();
-    const total = networkStats.reduce((sum, n) => sum + (n.value || 0), 0);
-    const sorted = [...networkStats].sort((a, b) => (b.value || 0) - (a.value || 0));
-    const plusGrand = sorted[0];
-    const second = sorted[1];
-    const debutMois = new Date(date.getFullYear(), date.getMonth(), 1);
-    const reseauxNouveaux = networkStats.filter(n => {
-      if (!n.createdAt) return false;
-      const d = new Date(n.createdAt);
-      return d >= debutMois;
-    });
-    return (
-      <Typography sx={{ fontSize: 18, color: '#444', fontStyle: 'italic', textAlign: 'center' }}>
-        {"À la date du "}
-        <Box component="span" fontWeight="bold" color="primary.main">{`${jour} ${mois} ${annee}`}</Box>
-        {", l’effectif total des membres des différents réseaux est de "}
-        <Box component="span" fontWeight="bold" color="primary.main">{total}</Box>
-        <Box component="span" fontWeight="bold" color="primary.main">{" personnes."}</Box>
-        {plusGrand && (
-          <>
-            {" Le plus grand réseau est "}
-            <Box component="span" fontWeight="bold" color="primary.main">{` « ${plusGrand.name} »`}</Box>
-            {" avec "}
-            <Box component="span" fontWeight="bold" color="primary.main">{plusGrand.value}</Box>
-            <Box component="span" fontWeight="bold" color="primary.main">{" membres"}</Box>
-            {second && (
-              <>
-                {", suivi du réseau "}
-                <Box component="span" fontWeight="bold" color="primary.main">{` « ${second.name} »`}</Box>
-                {" ("}
-                <Box component="span" fontWeight="bold" color="primary.main">{second.value}</Box>
-                <Box component="span" fontWeight="bold" color="primary.main">{" membres"}</Box>
-                {")"}
-              </>
-            )}
-            {"."}
-          </>
-        )}
-        {reseauxNouveaux.length > 0 && (
-          <>
-            {" "}
-            {reseauxNouveaux.length === 1 ? (
-              <>
-                {"En "}
-                <Box component="span" fontWeight="bold" color="primary.main">{`${mois} ${annee}`}</Box>
-                {", le réseau "}
-                <Box component="span" fontWeight="bold" color="primary.main">{` « ${reseauxNouveaux[0].name} »`}</Box>
-                {" a vu le jour."}
-              </>
-            ) : (
-              <>
-                {"En "}
-                <Box component="span" fontWeight="bold" color="primary.main">{`${mois} ${annee}`}</Box>
-                {", les réseaux "}
-                <Box component="span" fontWeight="bold" color="primary.main">{reseauxNouveaux.map(r => `« ${r.name} »`).join(', ')}</Box>
-                {" ont vu le jour."}
-              </>
-            )}
-          </>
-        )}
-      </Typography>
-    );
-  })()}
-</Box>
+                                        {(() => {
+                                            const date = new Date();
+                                            const mois = date.toLocaleString('fr-FR', { month: 'long' });
+                                            const annee = date.getFullYear();
+                                            const jour = date.getDate();
+                                            const total = networkStats.reduce((sum, n) => sum + (n.value || 0), 0);
+                                            const sorted = [...networkStats].sort((a, b) => (b.value || 0) - (a.value || 0));
+                                            const plusGrand = sorted[0];
+                                            const second = sorted[1];
+                                            const debutMois = new Date(date.getFullYear(), date.getMonth(), 1);
+                                            const reseauxNouveaux = networkStats.filter(n => {
+                                                if (!n.createdAt) return false;
+                                                const d = new Date(n.createdAt);
+                                                return d >= debutMois;
+                                            });
+                                            return (
+                                                <Typography sx={{ fontSize: 18, color: '#444', fontStyle: 'italic', textAlign: 'center' }}>
+                                                    {"À la date du "}
+                                                    <Box component="span" fontWeight="bold" color="primary.main">{`${jour} ${mois} ${annee}`}</Box>
+                                                    {", l’effectif total des membres des différents réseaux est de "}
+                                                    <Box component="span" fontWeight="bold" color="primary.main">{total}</Box>
+                                                    <Box component="span" fontWeight="bold" color="primary.main">{" personnes."}</Box>
+                                                    {plusGrand && (
+                                                        <>
+                                                            {" Le plus grand réseau est "}
+                                                            <Box component="span" fontWeight="bold" color="primary.main">{` « ${plusGrand.name} »`}</Box>
+                                                            {" avec "}
+                                                            <Box component="span" fontWeight="bold" color="primary.main">{plusGrand.value}</Box>
+                                                            <Box component="span" fontWeight="bold" color="primary.main">{" membres"}</Box>
+                                                            {second && (
+                                                                <>
+                                                                    {", suivi du réseau "}
+                                                                    <Box component="span" fontWeight="bold" color="primary.main">{` « ${second.name} »`}</Box>
+                                                                    {" ("}
+                                                                    <Box component="span" fontWeight="bold" color="primary.main">{second.value}</Box>
+                                                                    <Box component="span" fontWeight="bold" color="primary.main">{" membres"}</Box>
+                                                                    {")"}
+                                                                </>
+                                                            )}
+                                                            {"."}
+                                                        </>
+                                                    )}
+                                                    {reseauxNouveaux.length > 0 && (
+                                                        <>
+                                                            {" "}
+                                                            {reseauxNouveaux.length === 1 ? (
+                                                                <>
+                                                                    {"En "}
+                                                                    <Box component="span" fontWeight="bold" color="primary.main">{`${mois} ${annee}`}</Box>
+                                                                    {", le réseau "}
+                                                                    <Box component="span" fontWeight="bold" color="primary.main">{` « ${reseauxNouveaux[0].name} »`}</Box>
+                                                                    {" a vu le jour."}
+                                                                </>
+                                                            ) : (
+                                                                <>
+                                                                    {"En "}
+                                                                    <Box component="span" fontWeight="bold" color="primary.main">{`${mois} ${annee}`}</Box>
+                                                                    {", les réseaux "}
+                                                                    <Box component="span" fontWeight="bold" color="primary.main">{reseauxNouveaux.map(r => `« ${r.name} »`).join(', ')}</Box>
+                                                                    {" ont vu le jour."}
+                                                                </>
+                                                            )}
+                                                        </>
+                                                    )}
+                                                </Typography>
+                                            );
+                                        })()}
+                                    </Box>
                                 </Box>
                             </Paper>
                         </Grid>
-                        
+
                         {/* LineChart - Evolution membres réseaux */}
-                        <Grid item xs={12} md={8} sx={{ minWidth: 400, mt: 3}} >
+                        <Grid data-aos="fade-up" item xs={12} md={8} sx={{ minWidth: 400, mt: 3 }} >
                             <Paper sx={{ p: 3, height: 520, minWidth: 0, overflowX: 'auto', display: 'flex', flexDirection: 'column', justifyContent: 'center', backgroundColor: '#f9f9f9' }}>
                                 <Typography variant="h6" gutterBottom sx={{ fontSize: 22 }}>Évolution mensuelle des membres par réseau</Typography>
                                 <Box sx={{ flex: 1, minHeight: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -308,44 +312,107 @@ const Stats = () => {
                             </Paper>
 
                         </Grid>
-                        {/* BarChart - Comparaison annuelle réseaux */}
-                        <Grid item xs={12} md={8} sx={{ minWidth: 400, mt: 3 }}>
+                        {/* BarChart - Comparaison réseaux sur les 3 derniers mois */}
+                        <Grid data-aos="fade-up" item xs={12} md={8} sx={{ minWidth: 400, mt: 3 }}>
                             <Paper sx={{ p: 3, minHeight: 320, backgroundColor: '#f9f9f9' }}>
                                 <Typography variant="h6" gutterBottom sx={{ fontSize: 22 }}>
-                                    Comparaison de l’évolution des réseaux ({lastYear} vs {currentYear})
+                                    Comparaison de l’évolution des réseaux (3 derniers mois)
                                 </Typography>
                                 <ResponsiveContainer width="100%" height={400}>
-                                    <BarChart data={networkYearCompare}>
+                                    <BarChart data={(() => {
+                                        // networkEvolution = [{ month: '2025-02', R1: 10, R2: 15, ... }, ...]
+                                        if (!networkEvolution || networkEvolution.length === 0) return [];
+                                        // Prendre les 3 derniers mois
+                                        const last3 = networkEvolution.slice(-3);
+                                        // Obtenir la liste des réseaux (en-têtes, hors "month")
+                                        const networks = Object.keys(last3[0] || {}).filter(k => k !== 'month');
+                                        // Pour chaque réseau, construire un objet { network: 'Réseau', mois1: x, mois2: y, mois3: z }
+                                        return networks.map(network => {
+                                            const obj = { network };
+                                            last3.forEach((row, idx) => {
+                                                // Format mois court FR
+                                                const mois = new Date(row.month + '-01').toLocaleString('fr-FR', { month: 'short', year: '2-digit' });
+                                                obj[mois] = row[network] || 0;
+                                            });
+                                            return obj;
+                                        });
+                                    })()}>
                                         <RechartsTooltip />
                                         <CartesianGrid strokeDasharray="3 3" />
                                         <XAxis dataKey="network" />
                                         <YAxis allowDecimals={false} />
                                         <Legend />
-                                        <Bar dataKey={lastYear} fill="#8884d8" name={lastYear} activeBar={false} />
-                                        <Bar dataKey={currentYear} fill="#82ca9d" name={currentYear} activeBar={false} />
+                                        {/* Générer dynamiquement les Bar pour chaque mois */}
+                                        {(() => {
+                                            if (!networkEvolution || networkEvolution.length === 0) return null;
+                                            const last3 = networkEvolution.slice(-3);
+                                            return last3.map((row, idx) => {
+                                                const mois = new Date(row.month + '-01').toLocaleString('fr-FR', { month: 'short', year: '2-digit' });
+                                                const colors = ["#8884d8", "#82ca9d", "#ffc658"];
+                                                return (
+                                                    <Bar
+                                                        key={mois}
+                                                        dataKey={mois}
+                                                        fill={colors[idx % colors.length]}
+                                                        name={mois.charAt(0).toUpperCase() + mois.slice(1)}
+                                                        activeBar={false}
+                                                    />
+                                                );
+                                            });
+                                        })()}
                                     </BarChart>
                                 </ResponsiveContainer>
                             </Paper>
                         </Grid>
-                        {/* BarChart - Fréquentation cultes 
-                        <Grid item xs={12} md={12} sx={{ minWidth: 400, mt: 3 }}>
+                        {/* BarChart - Fréquentation cultes */}
+                        <Grid data-aos="fade-up" item xs={12} md={12} sx={{ minWidth: 400, mt: 3 }}>
                             <Paper sx={{ p: 3, height: 520, minWidth: 0, overflowX: 'auto', display: 'flex', flexDirection: 'column', justifyContent: 'center', backgroundColor: '#f9f9f9' }}>
-                                <Typography variant="h6" gutterBottom sx={{ fontSize: 22 }}>Fréquentation des cultes (dimanches du mois précédent)</Typography>
+                                <Typography variant="h6" gutterBottom sx={{ fontSize: 22 }}>
+                                    Fréquentation des cultes par culte (8 derniers dimanches)
+                                </Typography>
                                 <Box sx={{ flex: 1, minHeight: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                     <ResponsiveContainer width="100%" height={440}>
-                                        <BarChart data={serviceAttendance} margin={{ top: 20, right: 20, left: 0, bottom: 0 }}>
+                                        <LineChart data={(() => {
+                                            // Préparer les 8 derniers dimanches distincts présents dans serviceAttendance (sur le jour uniquement)
+                                            const allDays = serviceAttendance.map(s => new Date(s.date).toISOString().slice(0, 10));
+                                            //console.log('allDays:', allDays);
+                                            const uniqueDays = [...new Set(allDays)];
+                                            const sundaysStr = uniqueDays.sort().slice(-8);
+                                            const grouped = sundaysStr.map(dateStr => {
+                                                const entry = { date: new Date(dateStr).toLocaleDateString('fr-FR') };
+                                                ['Culte 1', 'Culte 2', 'Culte 3'].forEach((culteLabel, idx) => {
+                                                    const culte = serviceAttendance.find(s =>
+                                                        new Date(s.date).toISOString().slice(0, 10) === dateStr &&
+                                                        s.culte === culteLabel
+                                                    );
+                                                    entry[`culte${idx + 1}`] = culte ?
+                                                        (culte.total_adultes || 0) +
+                                                        (culte.total_enfants || 0) +
+                                                        (culte.total_chantres || 0) +
+                                                        (culte.total_protocoles || 0) +
+                                                        (culte.total_multimedia || 0) +
+                                                        (culte.total_respo_ecodim || 0) +
+                                                        (culte.total_animateurs_ecodim || 0) +
+                                                        (culte.total_enfants_ecodim || 0)
+                                                        : 0;
+                                                });
+                                                return entry;
+                                            });
+                                            return grouped;
+                                        })()} margin={{ top: 20, right: 20, left: 0, bottom: 0 }}>
                                             <CartesianGrid strokeDasharray="3 3" />
                                             <XAxis dataKey="date" />
-                                            <YAxis allowDecimals={false} />
+                                            <YAxis allowDecimals={false} interval={0} tickCount={10} />
                                             <RechartsTooltip />
                                             <Legend />
-                                            <Bar dataKey="adultes" fill="#1976d2" name="Adultes" />
-                                            <Bar dataKey="enfants" fill="#FFBB28" name="Enfants" />
-                                        </BarChart>
+                                            <Line type="monotone" dataKey="culte1" stroke="#1976d2" name="Culte 1" strokeWidth={2} dot={true} />
+                                            <Line type="monotone" dataKey="culte2" stroke="#FFBB28" name="Culte 2" strokeWidth={2} dot={true} />
+                                            <Line type="monotone" dataKey="culte3" stroke="#43a047" name="Culte 3" strokeWidth={2} dot={true} />
+                                        </LineChart>
                                     </ResponsiveContainer>
                                 </Box>
                             </Paper>
-                        </Grid>*/}
+                        </Grid>
                     </Grid>
                 )}
             </Box>

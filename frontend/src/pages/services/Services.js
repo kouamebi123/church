@@ -3,6 +3,7 @@ import { Box, Container, Typography } from '@mui/material';
 import { Outlet, useLocation } from 'react-router-dom';
 import Navbar from '../../components/Navbar';
 
+
 const Services = () => {
   const location = useLocation();
   const isNewService = location.pathname === '/services/new';

@@ -1,9 +1,11 @@
 import { Box, Typography, Button, TextField, TableCell, TableContainer, Table, TableHead, TableRow, Paper, TableBody, DialogActions, DialogContent, DialogTitle, IconButton, Dialog, Tooltip, Grid, FormControl, InputLabel, MenuItem, Select, Snackbar, Alert, CircularProgress } from '@mui/material';
+import DeleteConfirmDialog from '../../DeleteConfirmDialog';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
 import SearchIcon from '@mui/icons-material/Search';
 import { useState, useEffect } from 'react';
+import ErrorMessage from '../../ErrorMessage';
 
 const API_URL = process.env.REACT_APP_API_URL + '/api';
 
@@ -11,6 +13,9 @@ const Departments = () => {
 
     const [departments, setDepartments] = useState([]);
     const [departmentsError, setDepartmentsError] = useState(null);
+    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+    const [departmentToDelete, setDepartmentToDelete] = useState(null);
+    const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
     const [loadingDepartments, setLoadingDepartments] = useState(false);
     const [departmentModal, setDepartmentModal] = useState(false);
     const [editingDepartmentId, setEditingDepartmentId] = useState(null);
@@ -26,26 +31,40 @@ const Departments = () => {
         setDepartmentModal(true);
     };
 
-    const handleDeleteDepartment = async (id) => {
-        if (window.confirm('Êtes-vous sûr de vouloir supprimer ce département ?')) {
-            try {
-                const token = localStorage.getItem('token');
-                const response = await fetch(`${API_URL}/departments/${id}`, {
-                    method: 'DELETE',
-                    headers: {
-                        'Authorization': `Bearer ${token}`
-                    }
-                });
+    // Ouvre le dialog de confirmation
+    const handleOpenDeleteDialog = (department) => {
+        setDepartmentToDelete(department);
+        setDeleteDialogOpen(true);
+    };
 
-                if (response.ok) {
-                    await loadDepartments();
-                } else {
-                    const error = await response.json();
-                    console.error('Erreur lors de la suppression:', error);
+    // Ferme le dialog
+    const handleCloseDeleteDialog = () => {
+        setDeleteDialogOpen(false);
+        setDepartmentToDelete(null);
+    };
+
+    // Confirme la suppression
+    const handleConfirmDeleteDepartment = async () => {
+        if (!departmentToDelete) return;
+        try {
+            const token = localStorage.getItem('token');
+            const response = await fetch(`${API_URL}/departments/${departmentToDelete._id}`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': `Bearer ${token}`
                 }
-            } catch (err) {
-                console.error('Erreur lors de la suppression:', err);
+            });
+            if (response.ok) {
+                await loadDepartments();
+                setSnackbar({ open: true, message: 'Département supprimé avec succès', severity: 'success' });
+            } else {
+                const error = await response.json();
+                setSnackbar({ open: true, message: error.message || 'Erreur lors de la suppression', severity: 'error' });
             }
+        } catch (err) {
+            setSnackbar({ open: true, message: 'Erreur lors de la suppression', severity: 'error' });
+        } finally {
+            handleCloseDeleteDialog();
         }
     };
 
@@ -102,9 +121,11 @@ const Departments = () => {
                 setDepartmentModal(false);
                 setDepartmentForm({ nom: '' });
                 setEditingDepartmentId(null);
+                setSnackbar({ open: true, message: 'Département créé avec succès', severity: 'success' });
                 await loadDepartments();
             } else {
                 const error = await response.json();
+                setSnackbar({ open: true, message: error.message || 'Erreur lors de la création du département', severity: 'error' });
                 console.error('Erreur lors de l\'opération:', error);
             }
         } catch (err) {
@@ -115,7 +136,7 @@ const Departments = () => {
     return (
         <Box>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
-                <Typography variant="h4">Gestion des départements</Typography>
+                <Typography variant="h4" sx={{ mb: 2, fontWeight: 'bold', color: 'primary.main' }}>Gestion des départements</Typography>
                 <Button variant="contained" startIcon={<AddIcon />} onClick={() => setDepartmentModal(true)}>Nouveau département</Button>
             </Box>
             <TextField
@@ -134,9 +155,9 @@ const Departments = () => {
                     <CircularProgress />
                 </Box>
             ) : departmentsError ? (
-                <Typography color="error">{departmentsError}</Typography>
+                <ErrorMessage error={departmentsError} />
             ) : (
-                <TableContainer component={Paper}>
+                <TableContainer data-aos="fade-up" component={Paper}>
                     <Table>
                         <TableHead>
                             <TableRow>
@@ -166,11 +187,7 @@ const Departments = () => {
                                                 >
                                                     <EditIcon />
                                                 </IconButton>
-                                                <IconButton
-                                                    onClick={() => handleDeleteDepartment(department._id)}
-                                                    color="error"
-                                                    size="small"
-                                                >
+                                                <IconButton color="error" onClick={() => handleOpenDeleteDialog(department)}>
                                                     <DeleteIcon />
                                                 </IconButton>
                                             </TableCell>
@@ -222,9 +239,28 @@ const Departments = () => {
                     </DialogActions>
                 </form>
             </Dialog>
+            {/* Dialog de confirmation suppression */}
+            <DeleteConfirmDialog
+                open={deleteDialogOpen}
+                title="Supprimer le département"
+                content={departmentToDelete ? `Êtes-vous sûr de vouloir supprimer le département ${departmentToDelete.nom} ?` : "Êtes-vous sûr de vouloir supprimer ce département ?"}
+                onClose={handleCloseDeleteDialog}
+                onConfirm={handleConfirmDeleteDepartment}
+            />
+
+            {/* Snackbar feedback */}
+            <Snackbar
+                open={snackbar.open}
+                autoHideDuration={4000}
+                onClose={() => setSnackbar({ ...snackbar, open: false })}
+                anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+            >
+                <Alert onClose={() => setSnackbar({ ...snackbar, open: false })} severity={snackbar.severity} sx={{ width: '100%' }}>
+                    {snackbar.message}
+                </Alert>
+            </Snackbar>
         </Box>
     );
 };
 
 export default Departments;
-

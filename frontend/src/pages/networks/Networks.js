@@ -129,7 +129,7 @@ const Networks = () => {
         </Typography>
         <Grid container spacing={3}>
           {networks.map((network) => (
-            <Grid item xs={12} sm={6} md={3} key={network.id}>
+            <Grid data-aos="fade-up" item xs={12} sm={6} md={3} key={network.id}>
               <NetworkCard elevation={2} sx={{ minWidth: 360 }}>
                 <Typography variant="h5" gutterBottom>
                   {network.nom}

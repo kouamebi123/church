@@ -1,9 +1,12 @@
 import { Box, Typography, Button, TextField, TableCell, TableContainer, Table, TableHead, TableRow, Paper, TableBody, DialogActions, DialogContent, DialogTitle, IconButton, Dialog, Tooltip, Grid, FormControl, InputLabel, MenuItem, Select, Snackbar, Alert } from '@mui/material';
+import DeleteConfirmDialog from '../../DeleteConfirmDialog';
 import SearchIcon from '@mui/icons-material/Search';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
 import { useState, useEffect } from 'react';
+import Loading from '../../Loading';
+import ErrorMessage from '../../ErrorMessage';
 
 const Churches = () => {
 
@@ -12,6 +15,9 @@ const Churches = () => {
     const [loading, setLoading] = useState(false);
     const [churches, setChurches] = useState([]);
     const [churchesError, setChurchesError] = useState(null);
+    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+    const [churchToDelete, setChurchToDelete] = useState(null);
+    const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
 
     const API_URL = process.env.REACT_APP_API_URL + '/api';
 
@@ -70,6 +76,7 @@ const Churches = () => {
                 setChurchModal(false);
                 setChurchForm({ nom: '' });
                 setEditingChurchId(null);
+                setSnackbar({ open: true, message: 'Église créée avec succès', severity: 'success' });
                 // Recharger immédiatement les églises
                 await loadChurches();
             } else {
@@ -80,27 +87,40 @@ const Churches = () => {
         }
     };
 
-    const handleDeleteChurch = async (id) => {
-        if (window.confirm('Êtes-vous sûr de vouloir supprimer cette église ?')) {
-            try {
-                const token = localStorage.getItem('token');
-                const response = await fetch(`${API_URL}/churches/${id}`, {
-                    method: 'DELETE',
-                    headers: {
-                        'Authorization': `Bearer ${token}`
-                    }
-                });
+    // Ouvre le dialog de confirmation
+    const handleOpenDeleteDialog = (church) => {
+        setChurchToDelete(church);
+        setDeleteDialogOpen(true);
+    };
 
-                if (response.ok) {
-                    // Recharger immédiatement la liste après la suppression
-                    await loadChurches();
-                } else {
-                    const error = await response.json();
-                    console.error('Erreur lors de la suppression:', error);
+    // Ferme le dialog
+    const handleCloseDeleteDialog = () => {
+        setDeleteDialogOpen(false);
+        setChurchToDelete(null);
+    };
+
+    // Confirme la suppression
+    const handleConfirmDeleteChurch = async () => {
+        if (!churchToDelete) return;
+        try {
+            const token = localStorage.getItem('token');
+            const response = await fetch(`${API_URL}/churches/${churchToDelete._id}`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': `Bearer ${token}`
                 }
-            } catch (err) {
-                console.error('Erreur lors de la suppression:', err);
+            });
+            if (response.ok) {
+                await loadChurches();
+                setSnackbar({ open: true, message: 'Église supprimée avec succès', severity: 'success' });
+            } else {
+                const error = await response.json();
+                setSnackbar({ open: true, message: error.message || 'Erreur lors de la suppression', severity: 'error' });
             }
+        } catch (err) {
+            setSnackbar({ open: true, message: 'Erreur lors de la suppression', severity: 'error' });
+        } finally {
+            handleCloseDeleteDialog();
         }
     };
 
@@ -119,7 +139,7 @@ const Churches = () => {
     return (
         <Box>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
-                <Typography variant="h4">Gestion des églises</Typography>
+                <Typography variant="h4" sx={{ mb: 2, fontWeight: 'bold', color: 'primary.main' }}>Gestion des églises</Typography>
                 <Button variant="contained" startIcon={<AddIcon />} onClick={() => setChurchModal(true)}>Nouvelle église</Button>
             </Box>
             <TextField
@@ -134,11 +154,11 @@ const Churches = () => {
                 sx={{ mb: 3 }}
             />
             {loading ? (
-                <Typography>Chargement des églises...</Typography>
+                <Loading titre="Chargement des églises..." />
             ) : churchesError ? (
-                <Typography color="error">{churchesError}</Typography>
+                <ErrorMessage error={churchesError} />
             ) : (
-                <TableContainer component={Paper}>
+                <TableContainer data-aos="fade-up" component={Paper}>
                     <Table>
                         <TableHead>
                             <TableRow>
@@ -162,11 +182,7 @@ const Churches = () => {
                                                 >
                                                     <EditIcon />
                                                 </IconButton>
-                                                <IconButton
-                                                    onClick={() => handleDeleteChurch(church._id)}
-                                                    color="error"
-                                                    size="small"
-                                                >
+                                                <IconButton color="error" onClick={() => handleOpenDeleteDialog(church)}>
                                                     <DeleteIcon />
                                                 </IconButton>
                                             </TableCell>
@@ -218,6 +234,26 @@ const Churches = () => {
                     </DialogActions>
                 </form>
             </Dialog>
+            {/* Dialog de confirmation suppression */}
+            <DeleteConfirmDialog
+                open={deleteDialogOpen}
+                title="Supprimer l'église"
+                content={churchToDelete ? `Êtes-vous sûr de vouloir supprimer l'église ${churchToDelete.nom} ?` : "Êtes-vous sûr de vouloir supprimer cette église ?"}
+                onClose={handleCloseDeleteDialog}
+                onConfirm={handleConfirmDeleteChurch}
+            />
+
+            {/* Snackbar feedback */}
+            <Snackbar
+                open={snackbar.open}
+                autoHideDuration={4000}
+                onClose={() => setSnackbar({ ...snackbar, open: false })}
+                anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+            >
+                <Alert onClose={() => setSnackbar({ ...snackbar, open: false })} severity={snackbar.severity} sx={{ width: '100%' }}>
+                    {snackbar.message}
+                </Alert>
+            </Snackbar>
         </Box>
     );
 };

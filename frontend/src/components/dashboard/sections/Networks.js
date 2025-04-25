@@ -1,14 +1,17 @@
 
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Typography, Box, IconButton, TextField, Button, Dialog, DialogTitle, DialogContent, DialogActions, FormControl, InputLabel, Select, MenuItem, Collapse, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Grid } from '@mui/material';
+import { Typography, Box, IconButton, TextField, Button, Dialog, DialogTitle, DialogContent, DialogActions, FormControl, InputLabel, Select, MenuItem, Collapse, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Grid, Snackbar, Alert } from '@mui/material';
 import ExpandLess from '@mui/icons-material/ExpandLess';
 import ExpandMore from '@mui/icons-material/ExpandMore';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
+import DeleteConfirmDialog from '../../DeleteConfirmDialog';
 import SearchIcon from '@mui/icons-material/Search';
 import GroupIcon from '@mui/icons-material/Group';
+import Loading from './../../Loading';
+import ErrorMessage from '../../ErrorMessage';
 
 
 const Networks = () => {
@@ -23,6 +26,8 @@ const Networks = () => {
     const [networksError, setNetworksError] = useState(null);
     const [loading, setLoading] = useState(false);
     const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
+    const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+    const [networkToDelete, setNetworkToDelete] = useState(null);
     const [networkForm, setNetworkForm] = useState({
         nom: '',
         responsable1: '',
@@ -34,10 +39,11 @@ const Networks = () => {
     const [membersError, setMembersError] = useState(null);
 
 
-    
+
+
     // Fonction pour charger les membres
     const loadMembers = async () => {
-        setLoading(true);
+        //setLoading(true);
         try {
             const token = localStorage.getItem('token');
             const response = await fetch(`${API_URL}/users`, {
@@ -149,9 +155,12 @@ const Networks = () => {
                 setNetworkModal(false);
                 setNetworkForm({ nom: '', responsable1: '', responsable2: null });
                 setEditingNetworkId(null);
+                setSnackbar({ open: true, message: 'Réseau créé avec succès', severity: 'success' });
                 await loadNetworks();
             } else {
-                throw new Error(result.message || 'Erreur lors de l\'opération');
+                const error = await response.json();
+                setSnackbar({ open: true, message: error.message || 'Erreur lors de la création du réseau', severity: 'error' });
+                console.error('Erreur lors de l\'opération:', error);
             }
         } catch (err) {
             console.error('Erreur lors de l\'opération:', err);
@@ -169,36 +178,50 @@ const Networks = () => {
         setNetworkModal(true);
     };
 
-    const handleDeleteNetwork = async (id) => {
-        if (window.confirm('Êtes-vous sûr de vouloir supprimer ce réseau ?')) {
-            try {
-                const token = localStorage.getItem('token');
-                const response = await fetch(`${API_URL}/networks/${id}`, {
-                    method: 'DELETE',
-                    headers: {
-                        'Authorization': `Bearer ${token}`
-                    }
-                });
+    // Ouvre le dialog de confirmation
+    const handleOpenDeleteDialog = (network) => {
+        setNetworkToDelete(network);
+        setDeleteDialogOpen(true);
+    };
 
-                if (response.ok) {
-                    await loadNetworks();
-                } else {
-                    const error = await response.json();
-                    console.error('Erreur lors de la suppression:', error);
+    // Ferme le dialog
+    const handleCloseDeleteDialog = () => {
+        setDeleteDialogOpen(false);
+        setNetworkToDelete(null);
+    };
+
+    // Confirme la suppression
+    const handleConfirmDeleteNetwork = async () => {
+        if (!networkToDelete) return;
+        try {
+            const token = localStorage.getItem('token');
+            const response = await fetch(`${API_URL}/networks/${networkToDelete._id}`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': `Bearer ${token}`
                 }
-            } catch (err) {
-                console.error('Erreur lors de la suppression:', err);
+            });
+            if (response.ok) {
+                await loadNetworks();
+                setSnackbar({ open: true, message: 'Réseau supprimé avec succès', severity: 'success' });
+            } else {
+                const error = await response.json();
+                setSnackbar({ open: true, message: error.message || 'Erreur lors de la suppression', severity: 'error' });
             }
+        } catch (err) {
+            setSnackbar({ open: true, message: 'Erreur lors de la suppression', severity: 'error' });
+        } finally {
+            handleCloseDeleteDialog();
         }
     };
 
     return (
         <Box>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
-                <Typography variant="h4">Gestion des réseaux</Typography>
+                <Typography variant="h4" sx={{ mb: 2, fontWeight: 'bold', color: 'primary.main' }}>Gestion des réseaux</Typography>
                 <Button variant="contained" startIcon={<AddIcon />} onClick={() => setNetworkModal(true)}>Nouveau réseau</Button>
             </Box>
-            <TextField
+            <TextField data-aos="fade-up"
                 fullWidth
                 variant="outlined"
                 placeholder="Rechercher un réseau..."
@@ -210,17 +233,17 @@ const Networks = () => {
                 sx={{ mb: 3 }}
             />
             {loading ? (
-                <Typography>Chargement des réseaux...</Typography>
+                <Loading titre="Chargement des réseaux..." />
             ) : networksError ? (
-                <Typography color="error">{networksError}</Typography>
+                <ErrorMessage error={networksError} />
             ) : (
-                <TableContainer component={Paper}>
+                <TableContainer data-aos="fade-up" component={Paper}>
                     <Table>
                         <TableHead>
                             <TableRow>
-                                <TableCell>Nom</TableCell>
-                                <TableCell>Responsable(s)</TableCell>
-                                <TableCell align="right">Actions</TableCell>
+                                <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#f5f5f5' }}>Nom</TableCell>
+                                <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#f5f5f5' }}>Responsable(s)</TableCell>
+                                <TableCell align="right" sx={{ fontWeight: 'bold', backgroundColor: '#f5f5f5' }}>Actions</TableCell>
                             </TableRow>
                         </TableHead>
                         <TableBody>
@@ -249,11 +272,23 @@ const Networks = () => {
                                                         <EditIcon />
                                                     </IconButton>
                                                     <IconButton
-                                                        onClick={e => { e.stopPropagation(); handleDeleteNetwork(network._id); }}
+                                                        onClick={e => { e.stopPropagation(); handleOpenDeleteDialog(network); }}
                                                         color="error"
                                                         size="small"
                                                     >
                                                         <DeleteIcon />
+                                                    </IconButton>
+                                                    {/* Action: Détail réseau */}
+                                                    <IconButton
+                                                        onClick={e => {
+                                                            e.stopPropagation();
+                                                            window.open(`/networks/${network._id}`, '_blank');
+                                                        }}
+                                                        color="info"
+                                                        size="small"
+                                                        title="Voir détails"
+                                                    >
+                                                        <GroupIcon />
                                                     </IconButton>
                                                 </TableCell>
                                             </TableRow>
@@ -404,6 +439,26 @@ const Networks = () => {
                 </form>
             </Dialog>
 
+            {/* Dialog de confirmation suppression */}
+            <DeleteConfirmDialog
+                open={deleteDialogOpen}
+                title="Supprimer le réseau"
+                content={networkToDelete ? `Êtes-vous sûr de vouloir supprimer le réseau ${networkToDelete.nom} ?` : "Êtes-vous sûr de vouloir supprimer ce réseau ?"}
+                onClose={handleCloseDeleteDialog}
+                onConfirm={handleConfirmDeleteNetwork}
+            />
+
+            {/* Snackbar feedback */}
+            <Snackbar
+                open={snackbar.open}
+                autoHideDuration={4000}
+                onClose={() => setSnackbar({ ...snackbar, open: false })}
+                anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+            >
+                <Alert onClose={() => setSnackbar({ ...snackbar, open: false })} severity={snackbar.severity} sx={{ width: '100%' }}>
+                    {snackbar.message}
+                </Alert>
+            </Snackbar>
         </Box>
     );
 };

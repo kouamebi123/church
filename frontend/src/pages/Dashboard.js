@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Typography, 
-  Box, 
+import {
+  Typography,
+  Box,
   Drawer,
   List,
   ListItem,
@@ -11,33 +11,50 @@ import {
   Toolbar,
   IconButton,
   Divider,
-  Paper
+  
 } from '@mui/material';
 import { styled } from '@mui/material/styles';
+import Collapse from '@mui/material/Collapse';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import {
   Menu as MenuIcon,
-  Home as HomeIcon,
   People as PeopleIcon,
   AccountTree as NetworkIcon,
   Church as ChurchIcon,
-  Business as DepartmentIcon,
   BarChart as StatsIcon,
-  Image as ImageIcon,
-  ExitToApp as LogoutIcon
+  ExitToApp as LogoutIcon,
+  Settings as SettingsIcon,
+  BarChart as BarChartIcon,
+  GroupWork as GroupWorkIcon,
+  Event as EventIcon,
+  AccountTree as AccountTreeIcon,
+  PeopleAlt as PeopleAltIcon,
+  BusinessCenter as BusinessCenterIcon,
+  Collections as CollectionsIcon,
+  InsertChart as InsertChartIcon,
+  ReplyAllOutlined as ReplyAllOutlinedIcon,
+  LanOutlined as LanOutlinedIcon
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
-import Overview from '../components/dashboard/sections/Overview';
+import { useDispatch } from 'react-redux';
+import { logout } from '../features/auth/authSlice';
 import Stats from '../components/dashboard/sections/Stats';
+import StatsReseaux from '../components/dashboard/sections/StatsReseaux';
+import StatsCultes from '../components/dashboard/sections/StatsCultes';
 import Networks from '../components/dashboard/sections/Networks';
+import NetworksRecap from '../components/dashboard/sections/NetworksRecap';
 import Carousel from '../components/dashboard/sections/Carousel';
 import Membres from '../components/dashboard/sections/Membres';
+import UsersRetired from '../components/dashboard/sections/UsersRetired';
 import Churches from '../components/dashboard/sections/Churches';
 import Departments from '../components/dashboard/sections/Departments';
+import StatsMembres from '../components/dashboard/sections/StatsMembres';
+
 
 
 
 // Constants
-const drawerWidth = 240;
+const drawerWidth = 275;
 
 
 
@@ -46,11 +63,13 @@ const drawerWidth = 240;
 const StyledDrawer = styled(Drawer)(({ theme }) => ({
   width: drawerWidth,
   flexShrink: 0,
+  overflowX: 'hidden',
   '& .MuiDrawer-paper': {
     width: drawerWidth,
     boxSizing: 'border-box',
     backgroundColor: theme.palette.primary.main,
     color: theme.palette.primary.contrastText,
+    overflowX: 'hidden',
   },
 }));
 
@@ -59,6 +78,7 @@ const StyledListItem = styled(({ active, ...rest }) => <ListItem {...rest} />)(
     margin: '8px 16px',
     borderRadius: theme.shape.borderRadius,
     backgroundColor: active ? 'rgba(255, 255, 255, 0.2)' : 'transparent',
+    cursor: 'pointer',
     '&:hover': {
       backgroundColor: 'rgba(255, 255, 255, 0.1)',
     },
@@ -87,15 +107,41 @@ const Section = styled(Box)(({ theme }) => ({
 const Dashboard = () => {
   // ...états existants
 
-
- 
-
   const [mobileOpen, setMobileOpen] = useState(false);
   const [activeSection, setActiveSection] = useState('stats');
 
-
- 
   const navigate = useNavigate();
+
+  // Rendu conditionnel de la section active
+  const renderSection = () => {
+    switch (activeSection) {
+      case 'stats':
+        return <Stats />;
+      case 'statsReseaux':
+        return <StatsReseaux />;
+      case 'statsCultes':
+        return <StatsCultes />;
+      case 'networks':
+        return <Networks />;
+      case 'networksRecap':
+        return <NetworksRecap />;
+      case 'carousel':
+        return <Carousel />;
+      case 'users':
+        return <Membres />;
+      case 'usersRetired':
+        return <UsersRetired />;
+      case 'churches':
+        return <Churches />;
+      case 'departments':
+        return <Departments />;
+      case 'statsMembres':
+        return <StatsMembres />;
+      default:
+        return null;
+    }
+  };
+
 
   const [stats, setStats] = useState({
     total_users: 0,
@@ -115,25 +161,55 @@ const Dashboard = () => {
 
 
   const menuItems = [
-    { id: 'stats', text: 'Statistiques', icon: <StatsIcon /> },
-    { id: 'networks', text: 'Réseaux', icon: <NetworkIcon /> },
-    { id: 'users', text: 'Membres', icon: <PeopleIcon /> },
-    { id: 'churches', text: 'Églises', icon: <ChurchIcon /> },
-    { id: 'departments', text: 'Départements', icon: <DepartmentIcon /> },
-    { id: 'carousel', text: 'Carousel', icon: <ImageIcon /> },
+    {
+      text: 'Statistiques',
+      icon: <InsertChartIcon />,
+      children: [
+        { id: 'stats', text: "Vue d'ensemble", icon: <BarChartIcon /> },
+        { id: 'statsReseaux', text: "Réseaux", icon: <GroupWorkIcon /> },
+        { id: 'statsCultes', text: "Cultes", icon: <EventIcon /> },
+        { id: 'statsMembres', text: "Membres", icon: <PeopleIcon /> },
+      ]
+    },
+    {
+      text: 'Réseaux',
+      icon: <AccountTreeIcon />,
+      children: [
+        { id: 'networks', text: 'Gestion des réseaux', icon: <AccountTreeIcon /> },
+        { id: 'networksRecap', text: 'Récapitulatif des effectifs', icon: <PeopleAltIcon /> },
+      ]
+    },
+    {
+      text: 'Membres',
+      icon: <PeopleIcon />,
+      children: [
+        { id: 'users', text: 'Gestion des membres', icon: <PeopleIcon /> },
+        { id: 'usersRetired', text: 'Membres retirés', icon: <PeopleAltIcon /> },
+      ]
+    },
+    {
+      text: 'Configuration',
+      icon: <SettingsIcon />,
+      children: [
+        { id: 'churches', text: 'Églises', icon: <ChurchIcon /> },
+        { id: 'departments', text: 'Départements', icon: <BusinessCenterIcon /> },
+        { id: 'carousel', text: 'Carousel', icon: <CollectionsIcon /> }
+      ]
+    }
   ];
+
 
   useEffect(() => {
     const loadAllData = async () => {
-      
+
       try {
         await Promise.all([
-          
+
         ]);
       } catch (err) {
         console.error('Erreur lors du chargement des données:', err);
       } finally {
-        
+
       }
     };
 
@@ -149,36 +225,87 @@ const Dashboard = () => {
     return () => window.removeEventListener('hashchange', handleHashChange);
   }, []);
 
+  const [openMenu, setOpenMenu] = useState(null);
+
+  const handleMenuClick = (item) => {
+    if (item.children) {
+      setOpenMenu((prev) => (prev === item.text ? null : item.text));
+    } else {
+      window.location.hash = item.id;
+    }
+  };
+  const handleSubMenuClick = (subItem) => {
+    window.location.hash = subItem.id;
+  };
+
   const drawer = (
     <div>
       <Toolbar>
-        <Typography variant="h6" noWrap sx={{ color: 'white' }}>
+        <Typography
+          variant="h4"
+          noWrap
+          sx={{ color: 'white', fontWeight: 'bold', letterSpacing: 2, py: 2, cursor: 'pointer' }}
+          onClick={() => window.location.reload()}
+        >
           Administration
         </Typography>
       </Toolbar>
       <Divider sx={{ bgcolor: 'rgba(255,255,255,0.12)' }} />
       <List>
         {menuItems.map((item) => (
-          <StyledListItem 
-            button 
-            key={item.id} 
-            active={activeSection === item.id ? 1 : 0}
-            onClick={() => window.location.hash = item.id}
-          >
-            <ListItemIcon>{item.icon}</ListItemIcon>
-            <ListItemText
-              primary={item.text}
-              sx={{
-                '& .MuiListItemText-primary': {
-                  color: 'white'
-                }
-              }}
-            />
-          </StyledListItem>
+          <React.Fragment key={item.text || item.id}>
+            <StyledListItem
+              button
+              active={activeSection === item.id ? 1 : 0}
+              onClick={() => handleMenuClick(item)}
+            >
+              <ListItemIcon>{item.icon}</ListItemIcon>
+              <ListItemText
+                primary={item.text}
+                sx={{
+                  '& .MuiListItemText-primary': {
+                    color: 'white'
+                  }
+                }}
+              />
+              {item.children && (
+                <ExpandMoreIcon
+                  sx={{
+                    color: 'white',
+                    marginLeft: 'auto',
+                    marginRight: '9px',
+                    transition: 'transform 0.2s',
+                    transform: openMenu === item.text ? 'rotate(0deg)' : 'rotate(-90deg)'
+                  }}
+                />
+              )}
+            </StyledListItem>
+            {item.children && (
+              <Collapse in={openMenu === item.text} timeout="auto" unmountOnExit>
+                <List component="div" disablePadding>
+                  {item.children.map((sub) => (
+                    <StyledListItem
+                      key={sub.id}
+                      button
+                      sx={{ pl: 4, background: activeSection === sub.id ? 'rgba(255,255,255,0.15)' : 'transparent' }}
+                      active={activeSection === sub.id ? 1 : 0}
+                      onClick={() => handleSubMenuClick(sub)}
+                    >
+                      <ListItemIcon>{sub.icon}</ListItemIcon>
+                      <ListItemText
+                        primary={sub.text}
+                        sx={{ '& .MuiListItemText-primary': { color: 'white' } }}
+                      />
+                    </StyledListItem>
+                  ))}
+                </List>
+              </Collapse>
+            )}
+          </React.Fragment>
         ))}
         <StyledListItem button onClick={() => navigate('/')}>
           <ListItemIcon>
-            <LogoutIcon />
+            <ReplyAllOutlinedIcon />
           </ListItemIcon>
           <ListItemText
             primary="Retour au site"
@@ -192,6 +319,14 @@ const Dashboard = () => {
       </List>
     </div>
   );
+
+  const dispatch = useDispatch();
+  // navigate déjà déclaré plus haut
+
+  const handleLogout = () => {
+    dispatch(logout());
+    navigate('/login');
+  };
 
   return (
     <Box sx={{ display: 'flex' }}>
@@ -211,9 +346,18 @@ const Dashboard = () => {
           >
             <MenuIcon />
           </IconButton>
-          <Typography sx={{ color: 'white' }} variant="h6" noWrap>
+          <Typography sx={{ color: 'white', flexGrow: 1 }} variant="h6" noWrap>
             Tableau de bord
           </Typography>
+          <IconButton
+            color="inherit"
+            edge="end"
+            onClick={handleLogout}
+            sx={{ ml: 2 }}
+            title="Déconnexion"
+          >
+            <LogoutIcon />
+          </IconButton>
         </Toolbar>
       </AppBar>
 
@@ -237,46 +381,8 @@ const Dashboard = () => {
       </Box>
 
       <MainContent>
-        {/* Vue d'ensemble 
-        <Section className={activeSection === 'overview' ? 'active' : ''}>
-        <Stats />
-        </Section>*/}
-
-        {/* Statistiques */}
-        <Section className={activeSection === 'stats' ? 'active' : ''}>
-          <Stats />
-        </Section>
-        
-
-        {/* Réseaux */}
-        <Section className={activeSection === 'networks' ? 'active' : ''}>
-          <Networks />
-        </Section>
-
-        {/* Carousel */}
-        <Section className={activeSection === 'carousel' ? 'active' : ''}>
-          <Carousel />
-        </Section>
-
-        {/* Membres */}
-        <Section className={activeSection === 'users' ? 'active' : ''}>
-          <Membres   />
-        </Section>
-
-        {/* Églises */}
-        <Section className={activeSection === 'churches' ? 'active' : ''}>
-          <Churches />
-        </Section>
-
-        {/* Départements */}
-        <Section className={activeSection === 'departments' ? 'active' : ''}>
-          <Departments />
-        </Section>
-
-        
-
+        {renderSection()}
       </MainContent>
-      
     </Box>
   );
 };

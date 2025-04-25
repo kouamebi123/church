@@ -88,12 +88,12 @@ const Home = () => {
     { label: 'Total GR', value: stats.total_gr, icon: GroupWork },
     { label: 'Responsables GR', value: stats.total_resp_gr, icon: EmojiPeople },
     { label: 'Leaders', value: stats.total_leaders, icon: Star },
+    { label: 'Leaders (Tous)', value: stats.total_leaders_all, icon: Star },
     { label: 'Membres Réguliers', value: stats.total_reguliers, icon: Diversity3 },
     { label: 'Membres en intégration', value: stats.total_integration, icon: PersonAddAlt1 },
     { label: 'Membres Irréguliers', value: stats.total_irreguliers, icon: SentimentDissatisfied },
     { label: 'Ecodim', value: stats.total_ecodim, icon: ChildCare },
     { label: 'Responsables Ecodim', value: stats.total_resp_ecodim, icon: CoPresent },
-    { label: 'Personnes isolées', value: stats.total_personnes_isolees, icon: PersonOff }
   ];
 
   return (
@@ -103,13 +103,13 @@ const Home = () => {
       <Carousel />
 
       <StyledContainer maxWidth="lg">
-        <Typography variant="h4" sx={{ mb: 4, textAlign: 'center', fontWeight: 'bold', color: 'primary.main' }}>
+        <Typography variant="h3" sx={{ mb: 4, textAlign: 'center', fontWeight: 'bold', color: 'primary.main' }}>
           Statistiques Générales
         </Typography>
 
         <Grid container spacing={3}>
           {statsConfig.map((stat, index) => (
-            <Grid item xs={12} sm={6} md={3} key={index}>
+            <Grid data-aos="fade-up" item xs={12} sm={6} md={3} key={index}>
               <StatCard sx={{ height: '100%',width:210 }}>
                 <IconWrapper>
                   <stat.icon sx={{ fontSize: 30 }} />
@@ -123,7 +123,7 @@ const Home = () => {
               </StatCard>
             </Grid>
           ))}
-          <Grid item xs={12} sm={6} md={3}>
+          <Grid data-aos="fade-up" item xs={12} sm={6} md={3}>
             <StatCard isTotal sx={{ height: '100%',width:445 }}>
               <IconWrapper isTotal>
                 <People sx={{ fontSize: 30, color: 'primary.main' }} />

@@ -9,12 +9,15 @@ import { styled } from '@mui/material/styles';
 import { Divider } from '@mui/material';
 import axios from 'axios';
 
+// Autres imports existants
+import { keyframes } from '@mui/system';
+
 const API_URL = process.env.REACT_APP_API_URL;
 
 const CarouselContainer = styled(Box)(({ theme }) => ({
   position: 'relative',
   width: '100%',
-  height: '520px',
+  height: '550px',
   overflow: 'hidden',
   marginBottom: theme.spacing(4),
   '&::after': {
@@ -34,16 +37,26 @@ const CarouselSlide = styled(Box)(({ theme }) => ({
   width: '100%',
   height: '100%',
   opacity: 0,
-  transition: 'opacity 0.5s ease-in-out',
+  transition: 'opacity 0.9s ease-in-out',
   '&.active': {
     opacity: 1
   }
 }));
 
+const zoomIn = keyframes`
+  0% {
+    transform: scale(1);
+  }
+  100% {
+    transform: scale(1.12);
+  }
+`;
+
 const CarouselImage = styled('img')({
   width: '100%',
   height: '100%',
-  objectFit: 'cover'
+  objectFit: 'cover',
+  animation: `${zoomIn} 15s linear infinite`
 });
 
 const CarouselCaption = styled(Box)(({ theme }) => ({
@@ -235,10 +248,44 @@ const Carousel = () => {
         </CarouselSlide>
       ))}
       <CarouselControls>
-        <IconButton onClick={prevSlide} sx={{ color: 'white' }}>
+        <IconButton
+          onClick={prevSlide}
+          sx={{
+            color: 'rgba(255, 255, 255, 0.56)',
+            backgroundColor: 'rgba(76, 0, 130, 0.4)',
+            boxShadow: '0 4px 16px rgba(0,0,0,0.25)',
+            width: 48,
+            height: 48,
+            '&:hover': {
+              backgroundColor: 'rgba(76, 0, 130, 0.73)',
+              transform: 'scale(1.15)',
+              color: 'rgba(255, 255, 255, 0.86)',
+              border: '2px solid rgba(255, 255, 255, 0.57)',
+            },
+            border: '2px solid rgba(255, 255, 255, 0.29)',
+            transition: 'all 0.3s',
+          }}
+        >
           <ChevronLeft />
         </IconButton>
-        <IconButton onClick={nextSlide} sx={{ color: 'white' }}>
+        <IconButton
+          onClick={nextSlide}
+          sx={{
+            color: 'rgba(255, 255, 255, 0.56)',
+            backgroundColor: 'rgba(75, 0, 130, 0.42)',
+            boxShadow: '0 4px 16px rgba(0,0,0,0.25)',
+            width: 48,
+            height: 48,
+            '&:hover': {
+              backgroundColor: 'rgba(75, 0, 130, 1)',
+              transform: 'scale(1.15)',
+              color: 'rgba(255, 255, 255, 0.86)',
+              border: '2px solid rgba(255, 255, 255, 0.71)',
+            },
+            border: '2px solid rgba(255, 255, 255, 0.29)',
+            transition: 'all 0.3s',
+          }}
+        >
           <ChevronRight />
         </IconButton>
       </CarouselControls>

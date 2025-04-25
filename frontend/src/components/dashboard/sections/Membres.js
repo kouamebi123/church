@@ -1,5 +1,6 @@
 
 import { Box, Typography, Button, TextField, TableCell, TableContainer, Table, TableHead, TableRow, Paper, TableBody, DialogActions, DialogContent, DialogTitle, IconButton, Dialog, Tooltip, Grid, FormControl, InputLabel, MenuItem, Select, Snackbar, Alert } from '@mui/material';
+import DeleteConfirmDialog from '../../DeleteConfirmDialog';
 import AddIcon from '@mui/icons-material/Add';
 import SearchIcon from '@mui/icons-material/Search';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -8,10 +9,15 @@ import PersonIcon from '@mui/icons-material/Person';
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { ROLE_OPTIONS } from '../../../constants/enums';
+import Loading from '../../Loading';
+import ErrorMessage from '../../ErrorMessage';
 
 const API_URL = process.env.REACT_APP_API_URL + '/api';
 
 const Membres = () => {
+    // --- Ajout de l'état pour les groupes ---
+    const [groups, setGroups] = useState([]);
+    const [groupsError, setGroupsError] = useState(null);
     const [members, setMembers] = useState([]);
     const [membersError, setMembersError] = useState(null);
     const [loading, setLoading] = useState(false);
@@ -28,6 +34,9 @@ const Membres = () => {
     const [roleDialog, setRoleDialog] = useState({ open: false, member: null, role: '' });
     const [resetDialog, setResetDialog] = useState({ open: false, member: null, newPassword: '' });
     const [deleteDialog, setDeleteDialog] = useState({ open: false, member: null });
+    const [memberToDelete, setMemberToDelete] = useState(null);
+    const [isolatedMembers, setIsolatedMembers] = useState([]);
+
 
 
     const [memberForm, setMemberForm] = useState({
@@ -184,7 +193,7 @@ const Membres = () => {
 
     // Fonction pour charger les membres
     const loadMembers = async () => {
-        setLoading(true);
+        //setLoading(true);
         try {
             const token = localStorage.getItem('token');
             const response = await fetch(`${API_URL}/users`, {
@@ -209,70 +218,195 @@ const Membres = () => {
     useEffect(() => {
         loadMembers();
         loadChurches();
+        loadGroups();
+        loadIsolatedMembers();
     }, []);
+
+    const loadIsolatedMembers = async () => {
+        try {
+            const token = localStorage.getItem('token');
+            const response = await fetch(`${API_URL}/users/isoles`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+            const result = await response.json();
+            if (response.ok && result.success) {
+                setIsolatedMembers(result.data);
+            } else {
+                throw new Error(result.message || 'Erreur lors du chargement des membres non isolés');
+            }
+        } catch (err) {
+            console.error('Erreur lors du chargement des membres non isolés:', err);
+        }
+    };
+
+    // Fonction pour charger les groupes
+    const loadGroups = async () => {
+        try {
+            const token = localStorage.getItem('token');
+            const response = await fetch(`${API_URL}/groups`, {
+                headers: {
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+            const result = await response.json();
+            if (response.ok) {
+                setGroups(result.data);
+                setGroupsError(null);
+            } else {
+                throw new Error(result.message || 'Erreur lors du chargement des groupes');
+            }
+        } catch (err) {
+            setGroupsError('Erreur lors du chargement des groupes');
+            setGroups([]);
+            console.error(err);
+        }
+    };
+
+    // --- Ajout de l'état pour la recherche ---
+    const [searchTerm, setSearchTerm] = useState("");
+
+    // --- Ajout du filtre avancé ---
+    const FILTER_OPTIONS = [
+        { label: 'Tous', value: '' },
+        { label: 'Responsable réseau', value: 'Responsable réseau' },
+        { label: 'Responsables de GR', value: 'Responsables de GR' },//l'ensemble des personnes qui sont soit responsable1 ou responsable2 d'un groups (model groups.js)
+        { label: 'Leader', value: 'Leader' },
+        { label: 'Leaders (tous)', value: 'Leaders (tous)' },//l'ensemble des Leader, 12, 144, 1728, Responsable réseau.
+        { label: 'Régulier', value: 'Régulier' },
+        { label: 'En intégration', value: 'En intégration' },
+        { label: 'Irrégulier', value: 'Irrégulier' },
+        { label: 'Ecodim', value: 'Ecodim' },
+        { label: 'Responsable Ecodim', value: 'Responsable ecodim' },
+        { label: '12', value: '12' },
+        { label: '144', value: '144' },
+        { label: '1728', value: '1728' },
+        { label: 'Personnes isolées', value: 'Personnes isolées' },
+    ];
+    const [filter, setFilter] = useState('');
+
+    // Fonction de filtrage avancé
+    const filterMembers = (members) => {
+        if (!filter) return members;
+        // Cas spéciaux pour "Leaders (tous)" et "Responsables Ecodim"
+        if (filter === 'Leaders (tous)') {
+            return members.filter(m => m.qualification === 'Leader' || m.qualification === 'Responsable réseau' || m.qualification === '12' || m.qualification === '144' || m.qualification === '1728' || m.qualification === 'Responsable ecodim');
+        }
+        if (filter === 'Responsable ecodim') {
+            return members.filter(m => (m.qualification || '').toLowerCase().includes('ecodim') && (m.qualification || '').toLowerCase().includes('responsable'));
+        }
+        if (filter === 'Personnes isolées') {
+            return isolatedMembers;
+        }
+        // Cas spécial pour "Responsables de GR"
+        if (filter === 'Responsables de GR') {
+            // On extrait tous les responsables des groupes (responsable1 et responsable2)
+            const responsablesIds = new Set();
+            groups.forEach(gr => {
+                if (gr.responsable1 && gr.responsable1._id) responsablesIds.add(gr.responsable1._id);
+                if (gr.responsable2 && gr.responsable2._id) responsablesIds.add(gr.responsable2._id);
+            });
+            return members.filter(m => responsablesIds.has(m._id));
+        }
+        // Filtre standard sur qualification
+        return members.filter(m => (m.qualification || '').toLowerCase() === filter.toLowerCase());
+    };
 
     return (
         <Box>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
-                <Typography variant="h4">Gestion des membres</Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
+                <Typography variant="h4" sx={{ mb: 2, fontWeight: 'bold', color: 'primary.main' }}>Gestion des membres</Typography>
+                <FormControl sx={{ minWidth: 250, mx: 3 }}>
+                    <InputLabel>Filtrer par catégorie</InputLabel>
+                    <Select
+                        value={filter}
+                        label="Filtrer par catégorie"
+                        onChange={e => setFilter(e.target.value)}
+                    >
+                        {FILTER_OPTIONS.map(opt => (
+                            <MenuItem key={opt.value} value={opt.value}>{opt.label}</MenuItem>
+                        ))}
+                    </Select>
+                </FormControl>
                 <Button variant="contained" startIcon={<AddIcon />} onClick={() => setMemberModal(true)}>Nouveau membre</Button>
             </Box>
-            <TextField
+            <TextField data-aos="fade-up"
                 fullWidth
                 variant="outlined"
                 placeholder="Rechercher un membre..."
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
                 InputProps={{
                     startAdornment: <SearchIcon sx={{ mr: 1, color: 'text.secondary' }} />
                 }}
                 sx={{ mb: 3 }}
             />
             {loading ? (
-                <Typography>Chargement des membres...</Typography>
+                <Loading titre="Chargement des membres..." />
             ) : membersError ? (
-                <Typography color="error">{membersError}</Typography>
+                <ErrorMessage error={membersError} />
             ) : (
-                <TableContainer component={Paper}>
-                    <Table>
-                        <TableHead>
-                            <TableRow>
-                                <TableCell>Nom</TableCell>
-                                <TableCell>Email</TableCell>
-                                <TableCell>Téléphone</TableCell>
-                                <TableCell>Qualification</TableCell>
-                                <TableCell>Rôle</TableCell>
-                                <TableCell align="right">Actions</TableCell>
-                            </TableRow>
-                        </TableHead>
-                        <TableBody>
-                            {Array.isArray(members) && members.map(member => (
-                                <TableRow key={member._id}>
-                                    <TableCell>{member.username}</TableCell>
-                                    <TableCell>{member.email}</TableCell>
-                                    <TableCell>{member.telephone || '-'}</TableCell>
-                                    <TableCell>{member.qualification || '-'}</TableCell>
-                                    <TableCell>{member.role || '-'}</TableCell>
-                                    <TableCell align="right">
-                                        <Tooltip title="Attribuer des droits">
-                                            <IconButton size="small" color="primary" onClick={() => handleGrantRights(member)}>
-                                                <PersonIcon />
-                                            </IconButton>
-                                        </Tooltip>
-                                        <Tooltip title="Réinitialiser le mot de passe">
-                                            <IconButton size="small" color="secondary" onClick={() => handleResetPassword(member)}>
-                                                <LockResetIcon />
-                                            </IconButton>
-                                        </Tooltip>
-                                        <Tooltip title="Supprimer">
-                                            <IconButton size="small" color="error" onClick={() => handleDeleteMember(member)}>
-                                                <DeleteIcon />
-                                            </IconButton>
-                                        </Tooltip>
-                                    </TableCell>
+                <>
+                    {/* Affichage de l'effectif filtré */}
+                    <Typography data-aos="fade-up" sx={{ mb: 1, fontWeight: 'bold' }}>
+                        Effectif trouvé : {
+                            Array.isArray(members)
+                                ? filterMembers(members).filter(member =>
+                                    member.username?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                    member.email?.toLowerCase().includes(searchTerm.toLowerCase())
+                                ).length
+                                : 0
+                        }
+                    </Typography>
+                    <TableContainer data-aos="fade-up" component={Paper}>
+                        <Table>
+                            <TableHead>
+                                <TableRow>
+                                    <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#f5f5f5' }}>Nom</TableCell>
+                                    <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#f5f5f5' }}>Email</TableCell>
+                                    <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#f5f5f5' }}>Téléphone</TableCell>
+                                    <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#f5f5f5' }}>Qualification</TableCell>
+                                    <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#f5f5f5' }}>Rôle</TableCell>
+                                    <TableCell align="right" sx={{ fontWeight: 'bold', backgroundColor: '#f5f5f5' }}>Actions</TableCell>
                                 </TableRow>
-                            ))}
+                            </TableHead>
+                            <TableBody>
+                            {Array.isArray(members) && filterMembers(members)
+                                .filter(member =>
+                                    member.username?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                    member.email?.toLowerCase().includes(searchTerm.toLowerCase())
+                                )
+                                .map(member => (
+                                    <TableRow key={member._id}>
+                                        <TableCell>{member.username}</TableCell>
+                                        <TableCell>{member.email}</TableCell>
+                                        <TableCell>{member.telephone || '-'}</TableCell>
+                                        <TableCell>{member.qualification || '-'}</TableCell>
+                                        <TableCell>{member.role || '-'}</TableCell>
+                                        <TableCell align="right">
+                                            <Tooltip title="Attribuer des droits">
+                                                <IconButton size="small" color="primary" onClick={() => handleGrantRights(member)}>
+                                                    <PersonIcon />
+                                                </IconButton>
+                                            </Tooltip>
+                                            <Tooltip title="Réinitialiser le mot de passe">
+                                                <IconButton size="small" color="secondary" onClick={() => handleResetPassword(member)}>
+                                                    <LockResetIcon />
+                                                </IconButton>
+                                            </Tooltip>
+                                            <Tooltip title="Supprimer">
+                                                <IconButton size="small" color="error" onClick={() => handleDeleteMember(member)}>
+                                                    <DeleteIcon />
+                                                </IconButton>
+                                            </Tooltip>
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
                         </TableBody>
-                    </Table>
-                </TableContainer>
+                        </Table>
+                    </TableContainer>
+                </>
             )}
             {/* Dialog attribution de rôle */}
             <Dialog open={roleDialog.open} onClose={() => setRoleDialog({ open: false, member: null, role: '' })}>
@@ -352,30 +486,6 @@ const Membres = () => {
                     </Button>
                 </DialogActions>
             </Dialog>
-
-            {/* Dialog confirmation suppression */}
-            <Dialog open={deleteDialog.open} onClose={handleCloseDeleteDialog}>
-                <DialogTitle>Confirmer la suppression</DialogTitle>
-                <DialogContent>
-                    <Typography>Voulez-vous vraiment supprimer <b>{deleteDialog.member?.username}</b> ?</Typography>
-                </DialogContent>
-                <DialogActions>
-                    <Button onClick={handleCloseDeleteDialog}>Annuler</Button>
-                    <Button onClick={handleConfirmDelete} variant="contained" color="error">Supprimer</Button>
-                </DialogActions>
-            </Dialog>
-
-            {/* Snackbar feedback actions membres */}
-            <Snackbar
-                open={snackbar.open}
-                autoHideDuration={2000}
-                onClose={() => setSnackbar({ ...snackbar, open: false })}
-                anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-            >
-                <Alert onClose={() => setSnackbar({ ...snackbar, open: false })} severity={snackbar.severity} sx={{ width: '100%' }}>
-                    {snackbar.message}
-                </Alert>
-            </Snackbar>
 
             <Dialog
                 open={memberModal}
@@ -652,6 +762,26 @@ const Membres = () => {
                     </DialogActions>
                 </form>
             </Dialog>
+            {/* Dialog de confirmation suppression */}
+            <DeleteConfirmDialog
+                open={deleteDialog.open}
+                title="Supprimer le membre"
+                content={memberToDelete ? `Êtes-vous sûr de vouloir supprimer le membre ${memberToDelete.username} ?` : "Êtes-vous sûr de vouloir supprimer ce membre ?"}
+                onClose={handleCloseDeleteDialog}
+                onConfirm={handleConfirmDelete}
+            />
+
+            {/* Snackbar feedback */}
+            <Snackbar
+                open={snackbar.open}
+                autoHideDuration={4000}
+                onClose={() => setSnackbar({ ...snackbar, open: false })}
+                anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+            >
+                <Alert onClose={() => setSnackbar({ ...snackbar, open: false })} severity={snackbar.severity} sx={{ width: '100%' }}>
+                    {snackbar.message}
+                </Alert>
+            </Snackbar>
         </Box>
     );
 };

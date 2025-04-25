@@ -10,10 +10,14 @@ import {
   TextField,
   Button,
   Box,
-  MenuItem
+  MenuItem,
+  Snackbar,
+  Alert
 } from '@mui/material';
 import SuccessDialog from '../../components/layout/SuccessDialog';
 import { format } from 'date-fns';
+import ErrorMessage from '../../components/ErrorMessage';
+import { TYPES_CULTE_OPTIONS } from '../../constants/enums';
 
 const validationSchema = Yup.object({
   culte: Yup.string().required('Le type de culte est requis'),
@@ -41,6 +45,7 @@ const ServiceForm = () => {
   const [error, setError] = useState(null);
   const [superviseurs, setSuperviseurs] = useState([]);
   const [collecteurs, setCollecteurs] = useState([]);
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
 
   useEffect(() => {
     const fetchUsers = async () => {
@@ -71,7 +76,6 @@ const ServiceForm = () => {
 
   const formik = useFormik({
     initialValues: {
-      identifiant_culte: '',
       culte: '',
       orateur: '',
       date: new Date(),
@@ -102,6 +106,8 @@ const ServiceForm = () => {
           total_enfants_ecodim: Number(values.total_enfants_ecodim)
         };
 
+        console.log(formattedValues);
+
         await axios.post(`${API_URL}/api/services`, formattedValues, {
           headers: {
             'Authorization': `Bearer ${token}`
@@ -111,28 +117,18 @@ const ServiceForm = () => {
         // navigate('/services'); // Laisse l'utilisateur fermer le dialog d'abord
       } catch (error) {
         console.error('Erreur lors de la création du service:', error);
-        if (error.response && error.response.data) {
-          alert(error.response.data.message || 'Erreur lors de la création du service');
-        } else {
-          alert('Erreur lors de la création du service');
-        }
+        setSnackbar({ open: true, message: error.response?.data?.message || 'Erreur lors de la création du service', severity: 'error' });
       }
     }
   });
 
-  const typesCulte = [
-    'Culte du dimanche',
-    'Culte de prière',
-    'Culte spécial',
-    'Culte de jeûne',
-    'Autre'
-  ];
+  
 
   if (loading) return <div>Chargement...</div>;
-  if (error) return <div>Erreur: {error}</div>;
+  if (error) return <ErrorMessage error={error} />;
 
   return (
-    <Paper elevation={3} sx={{ p: 4 }}>
+    <Paper data-aos="fade-up" elevation={3} sx={{ p: 4 }}>
       <form onSubmit={formik.handleSubmit}>
         <Grid container spacing={3}>
           <Grid item xs={12} sm={6}>
@@ -146,9 +142,9 @@ const ServiceForm = () => {
               error={formik.touched.culte && Boolean(formik.errors.culte)}
               helperText={formik.touched.culte && formik.errors.culte}
             >
-              {typesCulte.map((option) => (
-                <MenuItem key={option} value={option}>
-                  {option}
+              {TYPES_CULTE_OPTIONS.map((option) => (
+                <MenuItem key={option.value} value={option.value}>
+                  {option.label}
                 </MenuItem>
               ))}
             </TextField>
@@ -349,14 +345,29 @@ const ServiceForm = () => {
           </Grid>
         </Grid>
       </form>
-    {/* Dialog de succès après création */}
-    <SuccessDialog
-      open={successDialogOpen}
-      onClose={() => { setSuccessDialogOpen(false); navigate('/services'); }}
-      title="Succès"
-      content="Le culte a été enregistré avec succès !"
-    />
-  </Paper>
+      {/* Dialog de succès après création */}
+      <SuccessDialog
+        open={successDialogOpen}
+        onClose={() => { setSuccessDialogOpen(false); 
+          formik.resetForm();
+        }}
+        title="Succès"
+        content="Le culte a été enregistré avec succès !"
+      />
+
+      {/* Snackbar feedback actions membres */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={2000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
+      >
+        <Alert onClose={() => setSnackbar({ ...snackbar, open: false })} severity={snackbar.severity} sx={{ width: '100%' }}>
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
+
+    </Paper>
   );
 };
 
