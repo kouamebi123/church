@@ -7,7 +7,11 @@ require('dotenv').config();
 const app = express();
 
 // Middleware
-app.use(cors());
+app.use(cors({
+    origin: 'https://church-frontend-51m6.onrender.com',
+    credentials: true
+  }));
+  
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
