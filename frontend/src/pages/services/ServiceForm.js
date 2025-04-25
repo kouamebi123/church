@@ -35,7 +35,7 @@ const validationSchema = Yup.object({
   superviseur: Yup.string().required('Le superviseur est requis')
 });
 
-const API_URL = 'http://localhost:5000';
+const API_URL = process.env.REACT_APP_API_URL+ '/api';
 
 const ServiceForm = () => {
   const [successDialogOpen, setSuccessDialogOpen] = useState(false);
