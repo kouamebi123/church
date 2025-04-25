@@ -8,11 +8,10 @@ const app = express();
 
 // Middleware
 const corsOptions = {
-    origin: 'https://church-frontend-51m6.onrender.com',
+    origin: ['https://church-frontend-51m6.onrender.com', 'http://localhost:3000'],
     credentials: true
 };
 app.use(cors(corsOptions));
-app.options('*', cors(corsOptions));
 
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
