@@ -51,14 +51,14 @@ const ServiceForm = () => {
     const fetchUsers = async () => {
       try {
         // Récupérer les superviseurs
-        const superviseursResponse = await axios.get(`${API_URL}/api/users`, {
+        const superviseursResponse = await axios.get(`${API_URL}/users`, {
           params: { role: 'superviseur' },
           headers: { 'Authorization': `Bearer ${token}` }
         });
         setSuperviseurs(superviseursResponse.data.data);
 
         // Récupérer les collecteurs
-        const collecteursResponse = await axios.get(`${API_URL}/api/users`, {
+        const collecteursResponse = await axios.get(`${API_URL}/users`, {
           params: { role: 'collecteur_culte' },
           headers: { 'Authorization': `Bearer ${token}` }
         });
@@ -108,7 +108,7 @@ const ServiceForm = () => {
 
         console.log(formattedValues);
 
-        await axios.post(`${API_URL}/api/services`, formattedValues, {
+        await axios.post(`${API_URL}/services`, formattedValues, {
           headers: {
             'Authorization': `Bearer ${token}`
           }
