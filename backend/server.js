@@ -8,7 +8,7 @@ const app = express();
 
 // Middleware
 const corsOptions = {
-    origin: ['https://church-frontend-51m6.onrender.com', 'http://localhost:3000'],
+    origin: ['https://church-frontend-51m6.onrender.com', 'http://localhost:3000', 'https://church-front-lilac.vercel.app'],
     credentials: true
 };
 app.use(cors(corsOptions));
