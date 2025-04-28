@@ -7,6 +7,7 @@ import { getMe } from './features/auth/authSlice';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import './App.css'
+import { SpeedInsights } from "@vercel/speed-insights/react"
 
 import store from './app/store';
 import theme from './theme';
@@ -37,6 +38,9 @@ const ServicesList = React.lazy(() => import('./pages/services/ServicesList'));
 const Dashboard = React.lazy(() => import('./pages/Dashboard'));
 const Groups = React.lazy(() => import('./pages/groups/Groups'));
 const Churches = React.lazy(() => import('./pages/churches/Churches'));
+
+
+
 
 function AppContent() {
   const dispatch = useDispatch();
@@ -128,6 +132,7 @@ function App() {
             </React.Suspense>
             <ToastContainer position="top-right" autoClose={5000} />
           </Layout>
+          <SpeedInsights />
         </Router>
       </ThemeProvider>
     </Provider>
@@ -135,3 +140,4 @@ function App() {
 }
 
 export default App;
+
