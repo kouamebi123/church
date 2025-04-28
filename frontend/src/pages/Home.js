@@ -102,15 +102,33 @@ const Home = () => {
 
       <Carousel />
 
-      <StyledContainer maxWidth="lg">
+      <Box width="100%" textAlign="center">
         <Typography variant="h3" sx={{ mb: 4, textAlign: 'center', fontWeight: 'bold', color: 'primary.main' }}>
           Statistiques Générales
         </Typography>
 
-        <Grid container spacing={3}>
+        <Grid container width="92%" mx="auto">
           {statsConfig.map((stat, index) => (
-            <Grid data-aos="fade-up" item xs={12} sm={6} md={3} key={index}>
-              <StatCard sx={{ height: '100%',width:210 }}>
+            <Grid
+              data-aos="fade-up"
+              item
+              key={index}
+              sx={{
+                width: '100%',
+                padding: '10px 10px 10px 10px',
+                '@media (min-width:460px) and (max-width:699px)': { width: '50%', height: '270px' },
+                '@media (min-width:700px) and (max-width:1099px)': { width: '33.33%', height: '270px' },
+                '@media (min-width:1100px) and (max-width:1199px)': { width: '25%', height: '270px' },
+                '@media (min-width:1200px) and (max-width:1599px)': { width: '20%', height: '270px' },
+                '@media (min-width:1600px)': { width: '20%' },
+                flexBasis: 'unset',
+                maxWidth: 'unset',
+                flexGrow: 0,
+                flexShrink: 0,
+                height: '100%'
+              }}
+            >
+              <StatCard sx={{ height: '100%', width: '100%', display: 'flex', flexDirection: 'column' }}>
                 <IconWrapper>
                   <stat.icon sx={{ fontSize: 30 }} />
                 </IconWrapper>
@@ -123,8 +141,25 @@ const Home = () => {
               </StatCard>
             </Grid>
           ))}
-          <Grid data-aos="fade-up" item xs={12} sm={6} md={3}>
-            <StatCard isTotal sx={{ height: '100%',width:445 }}>
+          <Grid
+            data-aos="fade-up"
+            item
+            sx={{
+              width: '100%',
+              padding: '10px 10px 10px 10px',
+              '@media (min-width:460px) and (max-width:699px)': { width: '50%', height: '270px' },
+              '@media (min-width:700px) and (max-width:1099px)': { width: '33.33%', height: '270px' },
+              '@media (min-width:1100px) and (max-width:1199px)': { width: '25%', height: '270px' },
+              '@media (min-width:1200px) and (max-width:1599px)': { width: '20%', height: '270px' },
+              '@media (min-width:1600px)': { width: '20%' },
+              flexBasis: 'unset',
+              maxWidth: 'unset',
+              flexGrow: 0,
+              flexShrink: 0,
+              height: '100%'
+            }}
+          >
+            <StatCard isTotal sx={{ height: '100%', width: '100%', display: 'flex', flexDirection: 'column' }}>
               <IconWrapper isTotal>
                 <People sx={{ fontSize: 30, color: 'primary.main' }} />
               </IconWrapper>
@@ -137,7 +172,7 @@ const Home = () => {
             </StatCard>
           </Grid>
         </Grid>
-      </StyledContainer>
+      </Box>
     </Box>
   );
 };

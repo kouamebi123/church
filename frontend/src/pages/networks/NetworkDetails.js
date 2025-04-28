@@ -505,9 +505,18 @@ function NetworkDetails() {
             )}
           </Box>
 
-          <Grid container spacing={3}>
+          <Grid container sx={{ mx: 'auto' }} alignItems="stretch">
             {(Array.isArray(networkData.grs) ? networkData.grs : []).map((gr) => (
-              <Grid data-aos="fade-up" item xs={12} md={6} key={gr.id}>
+              <Grid data-aos="fade-up"sx={{
+                width: '100%',
+                padding: '10px 10px 10px 10px',
+                '@media (min-width:500px) and (max-width:849px)': { width: '50%' },
+                '@media (min-width:850px) and (max-width:1199px)': { width: '33.33%' },
+                '@media (min-width:1200px) and (max-width:1599px)': { width: '25%' },
+                '@media (min-width:1600px)': { width: '20%' },
+                
+                
+              }} key={gr.id}>
                 <StyledCard>
                   <CardContent>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>

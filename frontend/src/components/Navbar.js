@@ -1,8 +1,18 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSelector, useDispatch } from 'react-redux';
-import { Box, Typography, Button, Paper, MenuItem, Menu, IconButton, Avatar } from '@mui/material';
-import { ArrowDropDown, Logout, Dashboard as DashboardIcon, AccountCircle } from '@mui/icons-material';
+import { Box, Typography, Button, Paper, MenuItem, Menu, IconButton, Avatar, Drawer, List, ListItem, ListItemButton, ListItemIcon, ListItemText, Divider } from '@mui/material';
+import MenuIcon from '@mui/icons-material/Menu';
+import {
+  ArrowDropDown,
+  Groups,
+  EventAvailable,
+  DashboardCustomize,
+  EventNote,
+  Logout,
+  Dashboard as DashboardIcon,
+  AccountCircle
+} from '@mui/icons-material';
 import { logout } from '../features/auth/authSlice';
 
 const Navbar = () => {
@@ -25,6 +35,12 @@ const Navbar = () => {
 
   // Menu utilisateur
   const [anchorEl, setAnchorEl] = React.useState(null);
+
+  // Mobile drawer
+  const [mobileOpen, setMobileOpen] = React.useState(false);
+  const handleDrawerToggle = () => {
+    setMobileOpen(!mobileOpen);
+  };
   const handleMenuOpen = (event) => {
     setAnchorEl(event.currentTarget);
   };
@@ -63,28 +79,41 @@ const Navbar = () => {
         transition: 'all 0.3s',
       }}
     >
-      <Box 
-        sx={{ 
-          display: 'flex', 
-          alignItems: 'center', 
-          gap: 2, 
-          cursor: 'pointer' 
-        }} 
+      <Box
+        sx={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 2,
+          cursor: 'pointer'
+        }}
         onClick={() => navigate('/')}
       >
         <img src={isScrolled ? "/logo-sm-acer (1).png" : "/logo-sm-acer.png"} alt="Logo" style={{ width: '40px', height: '40px', borderRadius: '50%' }} />
         <Typography sx={{ cursor: 'pointer', color: isScrolled ? 'primary.main' : 'white', transition: 'color 0.3s' }} variant="h6">Portail Cultes et Réseaux</Typography>
       </Box>
-      
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+
+      {/* Menu hamburger visible sur mobile */}
+      <Box sx={{ display: { xs: 'flex', md: 'none' }, alignItems: 'center' }}>
+        <IconButton
+          color="inherit"
+          aria-label="open drawer"
+          edge="end"
+          onClick={handleDrawerToggle}
+        >
+          <MenuIcon />
+        </IconButton>
+      </Box>
+
+      {/* Navigation classique visible sur desktop */}
+      <Box sx={{ display: { xs: 'none', md: 'flex' }, alignItems: 'center', gap: 3 }}>
         <Box sx={{ display: 'flex', gap: 2 }}>
           {(user?.role === 'superviseur' || user?.role === 'admin' || user?.role === 'collecteur_reseaux') && (
             <Button
               variant=""
               color="white"
               onClick={() => navigate('/networks')}
-              
-              sx={{ 
+
+              sx={{
                 borderRadius: '20px',
                 textTransform: 'none',
                 px: 2,
@@ -93,8 +122,8 @@ const Navbar = () => {
               Réseaux
             </Button>
           )}
-          <Box 
-            sx={{ 
+          <Box
+            sx={{
               position: 'relative',
               '&:hover': {
                 '& .menu-dropdown': {
@@ -109,7 +138,7 @@ const Navbar = () => {
               variant=""
               color="white"
               endIcon={<ArrowDropDown />}
-              sx={{ 
+              sx={{
                 borderRadius: '20px',
                 textTransform: 'none',
                 px: 2,
@@ -137,9 +166,9 @@ const Navbar = () => {
               }}
             >
               {(user?.role === 'superviseur' || user?.role === 'admin') && (
-                <MenuItem 
+                <MenuItem
                   onClick={() => navigate('/services/list')}
-                  sx={{ 
+                  sx={{
                     py: 1,
                     px: 2,
                     '&:hover': {
@@ -151,9 +180,9 @@ const Navbar = () => {
                 </MenuItem>
               )}
               {(user?.role === 'collecteur_culte' || user?.role === 'admin') && (
-                <MenuItem 
+                <MenuItem
                   onClick={() => navigate('/services/new')}
-                  sx={{ 
+                  sx={{
                     py: 1,
                     px: 2,
                     '&:hover': {
@@ -167,7 +196,7 @@ const Navbar = () => {
             </Paper>
           </Box>
         </Box>
-        
+
         {user && (
           <Box>
             <IconButton
@@ -177,7 +206,7 @@ const Navbar = () => {
               size="large"
             >
               <Avatar sx={{ width: 33, height: 33, bgcolor: 'primary.main' }}>
-                <AccountCircle sx={{ width: 33, height: 33}} />
+                <AccountCircle sx={{ width: 33, height: 33 }} />
               </Avatar>
             </IconButton>
             <Menu
@@ -199,6 +228,89 @@ const Navbar = () => {
           </Box>
         )}
       </Box>
+      {/* Drawer pour mobile */}
+      <Drawer
+        anchor="right"
+        open={mobileOpen}
+        onClose={handleDrawerToggle}
+        sx={{
+          display: { xs: 'block', md: 'none' },
+          '& .MuiDrawer-paper': {
+            boxSizing: 'border-box',
+            width: 270,
+            bgcolor: 'background.paper',
+            boxShadow: 6,
+          },
+        }}
+      >
+        <Box
+          sx={{ width: 270, p: 0 }}
+          role="presentation"
+          onClick={handleDrawerToggle}
+          onKeyDown={handleDrawerToggle}
+        >
+          {/* Header/logo du menu */}
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, p: 2, bgcolor: 'primary.main', color: 'white' }}>
+            <Typography variant="h6" sx={{ ml: 1, fontWeight: 700, color: 'white' }}>Menu</Typography>
+          </Box>
+          <Divider />
+          <List sx={{ p: 0 }}>
+            {(user?.role === 'superviseur' || user?.role === 'admin' || user?.role === 'collecteur_reseaux') && (
+              <ListItem disablePadding>
+                <ListItemButton onClick={() => navigate('/networks')} sx={{ py: 2 }}>
+                  <ListItemIcon sx={{ minWidth: 36 }}>
+                    <Groups color="primary" />
+                  </ListItemIcon>
+                  <ListItemText primary="Réseaux" primaryTypographyProps={{ fontWeight: 500 }} />
+                </ListItemButton>
+              </ListItem>
+            )}
+
+            <Divider sx={{ my: 1 }} />
+
+            <ListItem disablePadding>
+              <ListItemButton onClick={() => navigate('/services/list')} sx={{ py: 2 }}>
+                <ListItemIcon sx={{ minWidth: 36 }}>
+                  <EventAvailable color="primary" />
+                </ListItemIcon>
+                <ListItemText primary="Consulter les cultes" primaryTypographyProps={{ fontWeight: 500 }} />
+              </ListItemButton>
+            </ListItem>
+
+            <ListItem disablePadding>
+              <ListItemButton onClick={() => navigate('/services/new')} sx={{ py: 2 }}>
+                <ListItemIcon sx={{ minWidth: 36 }}>
+                  <EventNote  color="primary" />
+                </ListItemIcon>
+                <ListItemText primary="Enregistrer un culte" primaryTypographyProps={{ fontWeight: 500 }} />
+              </ListItemButton>
+            </ListItem>
+
+            <Divider sx={{ my: 1 }} />
+
+            {user && user.role === 'admin' && (
+              <ListItem disablePadding>
+                <ListItemButton onClick={handleDashboard} sx={{ py: 2 }}>
+                  <ListItemIcon sx={{ minWidth: 36 }}>
+                    <DashboardCustomize color="primary" />
+                  </ListItemIcon>
+                  <ListItemText primary="Dashboard" primaryTypographyProps={{ fontWeight: 500 }} />
+                </ListItemButton>
+              </ListItem>
+            )}
+
+            <ListItem disablePadding>
+              <ListItemButton onClick={handleLogout} sx={{ py: 2, color: 'error.main' }}>
+                <ListItemIcon sx={{ minWidth: 36 }}>
+                  <Logout color="error" />
+                </ListItemIcon>
+                <ListItemText primary="Déconnexion" primaryTypographyProps={{ fontWeight: 500 }} />
+              </ListItemButton>
+            </ListItem>
+
+          </List>
+        </Box>
+      </Drawer>
     </Box>
   );
 };

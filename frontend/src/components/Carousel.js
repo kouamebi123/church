@@ -254,8 +254,9 @@ const Carousel = () => {
             color: 'rgba(255, 255, 255, 0.56)',
             backgroundColor: 'rgba(76, 0, 130, 0.4)',
             boxShadow: '0 4px 16px rgba(0,0,0,0.25)',
-            width: 48,
-            height: 48,
+            width: { xs: 30, sm: 40, md: 48 },
+            height: { xs: 30, sm: 40, md: 48 },
+            '& svg': { fontSize: { xs: 24, sm: 28, md: 32 } },
             '&:hover': {
               backgroundColor: 'rgba(76, 0, 130, 0.73)',
               transform: 'scale(1.15)',
@@ -274,8 +275,9 @@ const Carousel = () => {
             color: 'rgba(255, 255, 255, 0.56)',
             backgroundColor: 'rgba(75, 0, 130, 0.42)',
             boxShadow: '0 4px 16px rgba(0,0,0,0.25)',
-            width: 48,
-            height: 48,
+            width: { xs: 30, sm: 40, md: 48 },
+            height: { xs: 30, sm: 40, md: 48 },
+            '& svg': { fontSize: { xs: 24, sm: 28, md: 32 } },
             '&:hover': {
               backgroundColor: 'rgba(75, 0, 130, 1)',
               transform: 'scale(1.15)',

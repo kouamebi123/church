@@ -102,7 +102,8 @@ const Login = () => {
         alignItems: 'center',
         justifyContent: 'center',
         minHeight: '100vh',
-        p: 0
+        p: 0,
+        margin: 'auto',
       }}>
         <motion.div
           initial={{ opacity: 0, y: 40 }}
@@ -121,7 +122,8 @@ const Login = () => {
               boxShadow: '0 8px 32px 0 rgba(31, 38, 135, 0.18)',
               position: 'relative',
               background: 'rgb(255, 255, 255)',
-              minWidth: { xs: 'auto', sm: 430 }
+              minWidth: { xs: 'auto', sm: 430 },
+              margin: '30px',
             }}
           >
           

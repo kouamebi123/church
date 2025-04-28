@@ -127,10 +127,21 @@ const Networks = () => {
         <Typography variant="h4" sx={{ mb: 4, color: 'primary.main', fontWeight: 'bold' }}>
           Gestion des Réseaux
         </Typography>
-        <Grid container spacing={3}>
+        <Grid container>
           {networks.map((network) => (
-            <Grid data-aos="fade-up" item xs={12} sm={6} md={3} key={network.id}>
-              <NetworkCard elevation={2} sx={{ minWidth: 360 }}>
+            <Grid data-aos="fade-up" sx={{
+              width: '100%',
+              padding: '10px 10px 10px 10px',
+              '@media (min-width:700px) and (max-width:1099px)': { width: '50%', },
+              '@media (min-width:1100px) and (max-width:1599px)': { width: '33.33%', },
+              '@media (min-width:1600px)': { width: '25%' },
+              flexBasis: 'unset',
+              maxWidth: 'unset',
+              flexGrow: 0,
+              flexShrink: 0,
+              height: '100%'
+            }} key={network.id}>
+              <NetworkCard elevation={2} >
                 <Typography variant="h5" gutterBottom>
                   {network.nom}
                 </Typography>
