@@ -8,6 +8,7 @@ import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import './App.css'
 import { SpeedInsights } from "@vercel/speed-insights/react"
+import { authService } from './services/authService';
 
 import store from './app/store';
 import theme from './theme';
@@ -22,122 +23,115 @@ import AOS from 'aos';
 import 'aos/dist/aos.css';
 
 // Lazy loading des pages
-const Home = React.lazy(() => import('./pages/Home'));
-const Profile = React.lazy(() => import('./pages/Profile'));
+const Home = React.lazy(() =>
+    import ('./pages/Home'));
+const Profile = React.lazy(() =>
+    import ('./pages/Profile'));
 
 // Réseaux
-const Networks = React.lazy(() => import('./pages/networks/Networks'));
-const NetworkDetails = React.lazy(() => import('./pages/networks/NetworkDetails'));
+const Networks = React.lazy(() =>
+    import ('./pages/networks/Networks'));
+const NetworkDetails = React.lazy(() =>
+    import ('./pages/networks/NetworkDetails'));
 
 // Cultes
-const Services = React.lazy(() => import('./pages/services/Services'));
-const ServiceForm = React.lazy(() => import('./pages/services/ServiceForm'));
-const ServicesList = React.lazy(() => import('./pages/services/ServicesList'));
+const Services = React.lazy(() =>
+    import ('./pages/services/Services'));
+const ServiceForm = React.lazy(() =>
+    import ('./pages/services/ServiceForm'));
+const ServicesList = React.lazy(() =>
+    import ('./pages/services/ServicesList'));
 
 // Autres pages
-const Dashboard = React.lazy(() => import('./pages/Dashboard'));
-const Groups = React.lazy(() => import('./pages/groups/Groups'));
-const Churches = React.lazy(() => import('./pages/churches/Churches'));
-
-
-
+const Dashboard = React.lazy(() =>
+    import ('./pages/Dashboard'));
 
 function AppContent() {
-  const dispatch = useDispatch();
+    const dispatch = useDispatch();
 
-  React.useEffect(() => {
-    const token = localStorage.getItem('token');
-    if (token) {
-      dispatch(getMe());
-    }
-  }, [dispatch]);
+    React.useEffect(() => {
+        // Vérifier l'authentification au démarrage
+        if (authService.isAuthenticated()) {
+            dispatch(getMe());
+        }
+    }, [dispatch]);
 
-  React.useEffect(() => {
-    AOS.init({
-      duration: 1000, // Durée de l'animation en ms
-    });
-  }, []);
+    React.useEffect(() => {
+        AOS.init({
+            duration: 1000, // Durée de l'animation en ms
+        });
+    }, []);
 
-  return (
-    <Routes>
-      <Route path="/login" element={
-        <RedirectIfAuth>
-          <Login />
-        </RedirectIfAuth>
-      } />
-      <Route path="/register" element={
-        <RedirectIfAuth>
-          <Register />
-        </RedirectIfAuth>
-      } />
-      <Route path="/" element={<Navigate to="/home" replace />} />
-      <Route path="/home" element={
-        <RequireAuth>
-          <Home />
-        </RequireAuth>
-      } />
-      <Route path="/profile" element={
-        <RequireAuth>
-          <Profile />
-        </RequireAuth>
-      } />
-      <Route path="/networks" element={
-        <RequireAuth>
-          <Networks />
-        </RequireAuth>
-      } />
-      <Route path="/networks/:id" element={
-        <RequireAuth>
-          <NetworkDetails />
-        </RequireAuth>
-      } />
-      <Route path="/services" element={
-        <RequireAuth>
-          <Services />
-        </RequireAuth>
-      }>
-        <Route index element={<ServicesList />} />
-        <Route path="new" element={<ServiceForm />} />
-        <Route path="list" element={<ServicesList />} />
-      </Route>
-      <Route path="/groups" element={
-        <RequireAuth>
-          <Groups />
-        </RequireAuth>
-      } />
-      <Route path="/churches" element={
-        <RequireAuth>
-          <Churches />
-        </RequireAuth>
-      } />
-      <Route path="/dashboard" element={
-        <RequireAuth>
-          <Dashboard />
-        </RequireAuth>
-      } />
-      <Route path="*" element={<NoFound />} />
-    </Routes>
-  );
+    return ( 
+        <Routes>
+            <Route path = "/login" element = { 
+                <RedirectIfAuth>
+                    <Login />
+                </RedirectIfAuth>
+            }/>
+            <Route path = "/register" element = { 
+                <RedirectIfAuth>
+                    <Register />
+                </RedirectIfAuth>
+            }/>
+            <Route path = "/" element = { < Navigate to = "/home" replace /> } />
+            <Route path = "/home" element = { 
+                <RequireAuth>
+                    <Home />
+                </RequireAuth>
+            }/>
+            <Route path = "/profile" element = { 
+                <RequireAuth>
+                    <Profile />
+                </RequireAuth>
+            }/>
+            <Route path = "/networks" element = { 
+                <RequireAuth>
+                    <Networks />
+                </RequireAuth>
+            }/>
+            <Route path = "/networks/:id" element = { 
+                <RequireAuth>
+                    <NetworkDetails />
+                </RequireAuth>
+            }/>
+            <Route path = "/services" element = { 
+                <RequireAuth>
+                    <Services />
+                </RequireAuth>
+            }>
+                <Route index element = {< ServicesList /> } />
+                <Route path = "new" element = { < ServiceForm /> } />
+                <Route path = "list" element = { < ServicesList /> } />
+            </Route>
+            <Route path = "/dashboard" element = { 
+                <RequireAuth>
+                    <Dashboard />
+                </RequireAuth> } />
+            <Route path = "*" element = { < NoFound /> } />
+        </Routes>
+    );
 }
 
 function App() {
-  return (
-    <Provider store={store}>
-      <ThemeProvider theme={theme}>
-        <CssBaseline />
-        <Router>
-          <Layout>
-            <React.Suspense fallback={<Loading titre="Chargement" />}>
-              <AppContent />
-            </React.Suspense>
-            <ToastContainer position="top-right" autoClose={5000} />
-          </Layout>
-          <SpeedInsights />
-        </Router>
-      </ThemeProvider>
-    </Provider>
-  );
+    return ( 
+        <Provider store = { store } >
+            <ThemeProvider theme = { theme } >
+                <CssBaseline />
+                <Router>
+                    <Layout>
+                        <React.Suspense fallback = {<Loading titre = "Chargement" /> } >
+                            <AppContent />
+                        </React.Suspense> 
+                        <ToastContainer position = "top-right"
+                        autoClose = { 5000 }
+                        />
+                    </Layout> 
+                    <SpeedInsights /> 
+                </Router> 
+            </ThemeProvider> 
+        </Provider>
+    );
 }
 
 export default App;
-

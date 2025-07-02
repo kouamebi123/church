@@ -63,14 +63,23 @@ exports.register = async (req, res) => {
             eglise_locale,
             departement,
             role: 'membre',
-            qualification: 'En integration'
+            qualification: 'En intégration'
         });
 
         sendTokenResponse(user, 201, res);
     } catch (error) {
+        // Gestion spécifique des erreurs de validation MongoDB
+        if (error.code === 11000) {
+            const field = Object.keys(error.keyValue)[0];
+            return res.status(400).json({
+                success: false,
+                message: `${field === 'pseudo' ? 'Ce pseudo' : 'Cet email'} est déjà utilisé`
+            });
+        }
+        
         res.status(400).json({
             success: false,
-            message: error.message
+            message: 'Erreur lors de l\'inscription'
         });
     }
 };

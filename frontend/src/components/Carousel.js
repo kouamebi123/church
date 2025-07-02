@@ -7,7 +7,7 @@ import {
 import { ChevronLeft, ChevronRight } from '@mui/icons-material';
 import { styled } from '@mui/material/styles';
 import { Divider } from '@mui/material';
-import axios from 'axios';
+import { apiService } from '../services/apiService';
 
 // Autres imports existants
 import { keyframes } from '@mui/system';
@@ -129,21 +129,10 @@ const Carousel = () => {
     const fetchImages = async () => {
       setLoading(true);
       try {
-        const token = localStorage.getItem('token');
-        const response = await axios.get(`${API_URL}/api/carousel`, {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
-  
-        if (response.status === 200 && response.data.success) {
-          const data = response.data.data;
-        
-          setImages(data);
-          setError(null);
-        } else {
-          throw new Error(response.data.message || 'Erreur lors du chargement des images..');
-        }
+        const response = await apiService.carousel.getAll();
+        const data = response.data?.data || response.data || [];
+        setImages(Array.isArray(data) ? data : []);
+        setError(null);
       } catch (err) {
         console.error('Erreur lors du chargement des images:', err);
         setError('Erreur lors du chargement des images.');

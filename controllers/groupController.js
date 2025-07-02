@@ -251,10 +251,17 @@ exports.deleteGroup = async (req, res) => {
 // @access  Private
 exports.addMember = async (req, res) => {
     try {
+        console.log('addMember appelé avec params:', req.params);
+        console.log('addMember appelé avec body:', req.body);
+        
         const group = await Group.findById(req.params.id);
-        const { userId } = req.body;
+        const { memberId } = req.body;
+
+        console.log('Groupe trouvé:', group ? 'Oui' : 'Non');
+        console.log('ID du groupe recherché:', req.params.id);
 
         if (!group) {
+            console.log('Groupe non trouvé avec ID:', req.params.id);
             return res.status(404).json({
                 success: false,
                 message: 'Groupe non trouvé'
@@ -262,8 +269,12 @@ exports.addMember = async (req, res) => {
         }
 
         // Vérifier si l'utilisateur existe
-        const user = await User.findById(userId);
+        const user = await User.findById(memberId);
+        console.log('Utilisateur trouvé:', user ? 'Oui' : 'Non');
+        console.log('ID de l\'utilisateur recherché:', memberId);
+        
         if (!user) {
+            console.log('Utilisateur non trouvé avec ID:', memberId);
             return res.status(404).json({
                 success: false,
                 message: 'Utilisateur non trouvé'
@@ -271,19 +282,22 @@ exports.addMember = async (req, res) => {
         }
 
         // Vérifier si l'utilisateur est déjà membre
-        if (group.members.includes(userId)) {
+        if (group.members.includes(memberId)) {
+            console.log('Utilisateur déjà membre du groupe');
             return res.status(400).json({
                 success: false,
                 message: 'L\'utilisateur est déjà membre de ce groupe'
             });
         }
 
+        console.log('Ajout de l\'utilisateur au groupe...');
         // Ajoute le membre si pas déjà présent
-        if (!group.members.includes(userId)) {
-            group.members.push(userId);
-            group.membersHistory.push({ user: userId, joinedAt: new Date(), leftAt: null });
+        if (!group.members.includes(memberId)) {
+            group.members.push(memberId);
+            group.membersHistory.push({ user: memberId, joinedAt: new Date(), leftAt: null });
         }
         await group.save();
+        console.log('Groupe sauvegardé avec succès');
 
         const updatedGroup = await Group.findById(group._id)
             .populate('network', 'nom')
@@ -291,11 +305,13 @@ exports.addMember = async (req, res) => {
             .populate('responsable2', 'username')
             .populate('members', 'username qualification');
 
+        console.log('Réponse envoyée avec succès');
         res.status(200).json({
             success: true,
             data: updatedGroup
         });
     } catch (error) {
+        console.error('Erreur dans addMember:', error);
         res.status(400).json({
             success: false,
             message: error.message

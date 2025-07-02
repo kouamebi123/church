@@ -13,6 +13,17 @@ const {
 
 router.use(protect);
 
+// Middleware de log pour déboguer
+router.use('/:id/members', (req, res, next) => {
+    console.log('Route /:id/members atteinte avec:', {
+        method: req.method,
+        params: req.params,
+        body: req.body,
+        url: req.url
+    });
+    next();
+});
+
 router.route('/')
     .get(getGroups)
     .post(authorize('admin', 'superviseur'), createGroup);

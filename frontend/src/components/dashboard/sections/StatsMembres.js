@@ -1,9 +1,8 @@
-import React, { useEffect, useState } from 'react';
-import axios from 'axios';
+import React, { useEffect, useState, useMemo } from 'react';
 import { Typography, Grid, CircularProgress, Box, Paper } from '@mui/material';
 import { ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend } from 'recharts';
 import { format, subMonths } from 'date-fns';
-
+import { apiService } from '../../../services/apiService';
 import { TRANCHE_AGE_OPTIONS } from '../../../constants/enums';
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#B455C6', '#FF6666', '#82ca9d', '#8884d8', '#ffc658', '#a4de6c', '#d0ed57'];
@@ -13,33 +12,35 @@ const StatsMembres = () => {
   const [qualifStats, setQualifStats] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const token = localStorage.getItem('token');
-  const API_URL = process.env.REACT_APP_API_URL + '/api';
+
+  const fetchData = useMemo(() => async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      // Utilise la nouvelle route pour n'avoir que les membres non isolés
+      const usersRes = await apiService.users.getNonIsoles();
+      const usersData = usersRes.data?.data || usersRes.data || [];
+      setUsers(Array.isArray(usersData) ? usersData : []);
+      
+      // Si tu veux calculer les stats qualification à partir des users non isolés :
+      const qualifMap = {};
+      (usersData || []).forEach(u => {
+        const q = u.qualification || 'Inconnu';
+        qualifMap[q] = (qualifMap[q] || 0) + 1;
+      });
+      setQualifStats(Object.entries(qualifMap).map(([qualification, count]) => ({ qualification, count })));
+    } catch (err) {
+      setError('Erreur lors du chargement des données');
+      setUsers([]);
+      setQualifStats([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true);
-      try {
-        // Utilise la nouvelle route pour n'avoir que les membres non isolés
-        const usersRes = await axios.get(`${API_URL}/users/non-isoles`, { headers: { 'Authorization': `Bearer ${token}` } });
-        // Pour les stats par qualification, on peut recalculer côté front ou adapter le backend si besoin
-        setUsers(usersRes.data.data || []);
-        // Si tu veux calculer les stats qualification à partir des users non isolés :
-        const qualifMap = {};
-        (usersRes.data.data || []).forEach(u => {
-          const q = u.qualification || 'Inconnu';
-          qualifMap[q] = (qualifMap[q] || 0) + 1;
-        });
-        setQualifStats(Object.entries(qualifMap).map(([qualification, count]) => ({ qualification, count })));
-      } catch (err) {
-        setUsers([]);
-        setQualifStats([]);
-      } finally {
-        setLoading(false);
-      }
-    };
     fetchData();
-  }, []);
+  }, [fetchData]);
 
   // 2. Pyramide des âges (par valeur exacte de tranche_age)
   const ageStats = TRANCHE_AGE_OPTIONS.map(opt => ({

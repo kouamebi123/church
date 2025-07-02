@@ -18,6 +18,10 @@ const networkSchema = new mongoose.Schema({
     active: {
         type: Boolean,
         default: true
+    },
+    church: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Church'
     }
 }, {
     timestamps: true,
@@ -83,7 +87,7 @@ networkSchema.virtual('qualificationStats').get(async function() {
         'Régulier': members.filter(m => m.qualification === 'Régulier').length,
         'Irrégulier': members.filter(m => m.qualification === 'Irrégulier').length,
         'En intégration': members.filter(m => m.qualification === 'En intégration').length,
-        'Membre simple': members.filter(m => !["12", "144", "1728", "Leader", "Responsable reseau"].includes(m.qualification)).length,
+        'Membre simple': members.filter(m => !["12", "144", "1728", "Leader", "Responsable réseau"].includes(m.qualification)).length,
         totalMembers: members.length
     };
     

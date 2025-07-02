@@ -1,6 +1,4 @@
-
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
 import { Typography, Box, IconButton, TextField, Button, Dialog, DialogTitle, DialogContent, DialogActions, FormControl, InputLabel, Select, MenuItem, Collapse, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Grid, Snackbar, Alert } from '@mui/material';
 import ExpandLess from '@mui/icons-material/ExpandLess';
 import ExpandMore from '@mui/icons-material/ExpandMore';
@@ -12,9 +10,27 @@ import SearchIcon from '@mui/icons-material/Search';
 import GroupIcon from '@mui/icons-material/Group';
 import Loading from './../../Loading';
 import ErrorMessage from '../../ErrorMessage';
-
+import { useNetworks } from '../../../hooks/useApi';
+import { useNotification } from '../../../hooks/useNotification';
+import { apiService } from '../../../services/apiService';
 
 const Networks = () => {
+    const {
+        networks,
+        loading,
+        error,
+        fetchNetworks,
+        createNetwork,
+        updateNetwork,
+        deleteNetwork
+    } = useNetworks();
+
+    const {
+        notification,
+        showSuccess,
+        showError,
+        hideNotification
+    } = useNotification();
 
     const [expandedNetworkId, setExpandedNetworkId] = useState(null);
     const [expandedGrId, setExpandedGrId] = useState(null);
@@ -22,65 +38,53 @@ const Networks = () => {
     const [networkGrs, setNetworkGrs] = useState({});
     const [groupDetails, setGroupDetails] = useState({});
     const [networkModal, setNetworkModal] = useState(false);
-    const [networks, setNetworks] = useState([]);
-    const [networksError, setNetworksError] = useState(null);
-    const [loading, setLoading] = useState(false);
-    const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [networkToDelete, setNetworkToDelete] = useState(null);
     const [networkForm, setNetworkForm] = useState({
         nom: '',
         responsable1: '',
-        responsable2: null
+        responsable2: null,
+        church: ''
     });
     const [editingNetworkId, setEditingNetworkId] = useState(null);
     const [networkSearchTerm, setNetworkSearchTerm] = useState('');
     const [members, setMembers] = useState([]);
     const [membersError, setMembersError] = useState(null);
-
-
-
+    const [churches, setChurches] = useState([]);
 
     // Fonction pour charger les membres
     const loadMembers = async () => {
-        //setLoading(true);
         try {
-            const token = localStorage.getItem('token');
-            const response = await fetch(`${API_URL}/users`, {
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
-            });
-            const result = await response.json();
-            if (response.ok && result.success) {
-                setMembers(result.data);
-            } else {
-                throw new Error(result.message || 'Erreur lors du chargement des membres');
-            }
+            const response = await apiService.users.getAll();
+            setMembers(response.data?.data || response.data || []);
         } catch (err) {
             setMembersError('Erreur lors du chargement des membres');
             console.error(err);
-        } finally {
-            setLoading(false);
         }
     };
 
-    const token = localStorage.getItem('token');
-    const API_URL = process.env.REACT_APP_API_URL + '/api';
+    const loadChurches = async () => {
+        try {
+            const response = await apiService.churches.getAll();
+            setChurches(response.data?.data || response.data || []);
+        } catch (err) {
+            setChurches([]);
+        }
+    };
 
     const handleNetworkClick = async (networkId) => {
         setExpandedNetworkId(expandedNetworkId === networkId ? null : networkId);
         setExpandedGrId(null);
         if (!networkDetails[networkId]) {
             try {
-                const res = await axios.get(`${API_URL}/networks/${networkId}`, { headers: { Authorization: `Bearer ${token}` } });
-                setNetworkDetails(prev => ({ ...prev, [networkId]: res.data.data }));
+                const res = await apiService.networks.getById(networkId);
+                setNetworkDetails(prev => ({ ...prev, [networkId]: res.data?.data || res.data }));
             } catch (e) { /* gestion erreur possible */ }
         }
         if (!networkGrs[networkId]) {
             try {
-                const res = await axios.get(`${API_URL}/networks/${networkId}/grs`, { headers: { Authorization: `Bearer ${token}` } });
-                setNetworkGrs(prev => ({ ...prev, [networkId]: res.data.data }));
+                const res = await apiService.networks.getGroups(networkId);
+                setNetworkGrs(prev => ({ ...prev, [networkId]: res.data?.data || res.data }));
             } catch (e) { /* gestion erreur possible */ }
         }
     };
@@ -89,90 +93,51 @@ const Networks = () => {
         setExpandedGrId(expandedGrId === grId ? null : grId);
         if (!groupDetails[grId]) {
             try {
-                const res = await axios.get(`${API_URL}/groups/${grId}`, { headers: { Authorization: `Bearer ${token}` } });
-                setGroupDetails(prev => ({ ...prev, [grId]: res.data.data }));
+                const res = await apiService.groups.getById(grId);
+                setGroupDetails(prev => ({ ...prev, [grId]: res.data?.data || res.data }));
             } catch (e) { /* gestion erreur possible */ }
         }
     };
 
-
-    // Fonction pour charger les réseaux
-    const loadNetworks = async () => {
-        try {
-            const token = localStorage.getItem('token');
-            const response = await fetch(`${API_URL}/networks`, {
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
-            });
-            const result = await response.json();
-            if (response.ok && result.success) {
-                setNetworks(result.data);
-                setNetworksError(null);
-            } else {
-                throw new Error(result.message || 'Erreur lors du chargement des réseaux');
-            }
-        } catch (err) {
-            setNetworksError('Erreur lors du chargement des réseaux');
-            setNetworks([]);
-            console.error(err);
-        }
-    };
-
     useEffect(() => {
-        loadNetworks();
+        fetchNetworks();
         loadMembers();
-    }, []);
+        loadChurches();
+    }, [fetchNetworks]);
 
     // Fonctions de gestion des formulaires
     const handleNetworkSubmit = async (e) => {
         e.preventDefault();
         try {
-            const token = localStorage.getItem('token');
-            const url = editingNetworkId
-                ? `${API_URL}/networks/${editingNetworkId}`
-                : `${API_URL}/networks`;
-
-            // Préparer les données à envoyer, en excluant le responsable2 si null
             const formData = {
                 nom: networkForm.nom,
                 responsable1: networkForm.responsable1,
-                ...(networkForm.responsable2 && { responsable2: networkForm.responsable2 })
+                ...(networkForm.responsable2 && { responsable2: networkForm.responsable2 }),
+                church: networkForm.church || null
             };
 
-            const response = await fetch(url, {
-                method: editingNetworkId ? 'PUT' : 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify(formData)
-            });
-
-            const result = await response.json();
-
-            if (response.ok) {
-                setNetworkModal(false);
-                setNetworkForm({ nom: '', responsable1: '', responsable2: null });
-                setEditingNetworkId(null);
-                setSnackbar({ open: true, message: 'Réseau créé avec succès', severity: 'success' });
-                await loadNetworks();
+            if (editingNetworkId) {
+                await updateNetwork(editingNetworkId, formData);
+                showSuccess('Réseau modifié avec succès');
             } else {
-                const error = await response.json();
-                setSnackbar({ open: true, message: error.message || 'Erreur lors de la création du réseau', severity: 'error' });
-                console.error('Erreur lors de l\'opération:', error);
+                await createNetwork(formData);
+                showSuccess('Réseau créé avec succès');
             }
+
+            setNetworkModal(false);
+            setNetworkForm({ nom: '', responsable1: '', responsable2: null, church: '' });
+            setEditingNetworkId(null);
         } catch (err) {
-            console.error('Erreur lors de l\'opération:', err);
-            alert(err.message);
+            showError(err.message || 'Erreur lors de l\'opération');
         }
     };
 
     const handleEditNetwork = (network) => {
         setNetworkForm({
             nom: network.nom,
-            responsable1: network.responsable1,
-            responsable2: network.responsable2 || null
+            responsable1: network.responsable1?._id || network.responsable1 || '',
+            responsable2: network.responsable2?._id || network.responsable2 || null,
+            church: network.church?._id || network.church || ''
         });
         setEditingNetworkId(network._id);
         setNetworkModal(true);
@@ -194,22 +159,10 @@ const Networks = () => {
     const handleConfirmDeleteNetwork = async () => {
         if (!networkToDelete) return;
         try {
-            const token = localStorage.getItem('token');
-            const response = await fetch(`${API_URL}/networks/${networkToDelete._id}`, {
-                method: 'DELETE',
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
-            });
-            if (response.ok) {
-                await loadNetworks();
-                setSnackbar({ open: true, message: 'Réseau supprimé avec succès', severity: 'success' });
-            } else {
-                const error = await response.json();
-                setSnackbar({ open: true, message: error.message || 'Erreur lors de la suppression', severity: 'error' });
-            }
+            await deleteNetwork(networkToDelete._id);
+            showSuccess('Réseau supprimé avec succès');
         } catch (err) {
-            setSnackbar({ open: true, message: 'Erreur lors de la suppression', severity: 'error' });
+            showError(err.message || 'Erreur lors de la suppression');
         } finally {
             handleCloseDeleteDialog();
         }
@@ -234,8 +187,8 @@ const Networks = () => {
             />
             {loading ? (
                 <Loading titre="Chargement des réseaux..." />
-            ) : networksError ? (
-                <ErrorMessage error={networksError} />
+            ) : error ? (
+                <ErrorMessage error={error} />
             ) : (
                 <TableContainer data-aos="fade-up" component={Paper}>
                     <Table>
@@ -243,6 +196,7 @@ const Networks = () => {
                             <TableRow>
                                 <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#f5f5f5' }}>Nom</TableCell>
                                 <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#f5f5f5' }}>Responsable(s)</TableCell>
+                                <TableCell sx={{ fontWeight: 'bold', backgroundColor: '#f5f5f5' }}>Église</TableCell>
                                 <TableCell align="right" sx={{ fontWeight: 'bold', backgroundColor: '#f5f5f5' }}>Actions</TableCell>
                             </TableRow>
                         </TableHead>
@@ -260,8 +214,13 @@ const Networks = () => {
                                                     {network.nom}
                                                 </TableCell>
                                                 <TableCell>
-                                                    {network.responsable1?.username}
-                                                    {network.responsable2 ? ` & ${network.responsable2.username}` : ''}
+                                                    {network.responsable1 && members.find(m => m._id === network.responsable1)?.username}
+                                                    {network.responsable2 && (
+                                                        <>, {members.find(m => m._id === network.responsable2)?.username}</>
+                                                    )}
+                                                </TableCell>
+                                                <TableCell>
+                                                    {network.church ? (churches.find(c => c._id === (network.church._id || network.church))?.nom || '-') : '-'}
                                                 </TableCell>
                                                 <TableCell align="right">
                                                     <IconButton
@@ -387,7 +346,7 @@ const Networks = () => {
                 }}
             >
 
-                <DialogTitle>Nouveau réseau</DialogTitle>
+                <DialogTitle>{editingNetworkId ? 'Modifier le réseau' : 'Nouveau réseau'}</DialogTitle>
                 <form onSubmit={handleNetworkSubmit}>
                     <DialogContent sx={{ display: 'flex', justifyContent: 'center' }}>
                         <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%' }}>
@@ -403,28 +362,50 @@ const Networks = () => {
                                     />
                                 </Grid>
                                 <Grid item xs={12} sx={{ display: 'flex', justifyContent: 'center' }}>
-                                    <FormControl sx={{ width: 400 }} margin="normal" required>
-                                        <InputLabel>Responsable 1</InputLabel>
+                                    <FormControl sx={{ width: 400 }} margin="normal">
+                                        <InputLabel id="church-label">Église</InputLabel>
                                         <Select
-                                            value={networkForm.responsable1 || ''}
-                                            onChange={(e) => setNetworkForm({ ...networkForm, responsable1: e.target.value })}
+                                            labelId="church-label"
+                                            value={networkForm.church}
+                                            label="Église"
+                                            onChange={(e) => setNetworkForm({ ...networkForm, church: e.target.value })}
                                         >
-                                            {Array.isArray(members) && members.map((member) => (
-                                                <MenuItem key={member._id} value={member._id}>{member.username}</MenuItem>
+                                            <MenuItem value=""><em>Aucune</em></MenuItem>
+                                            {churches.map((church) => (
+                                                <MenuItem key={church._id} value={church._id}>{church.nom}</MenuItem>
                                             ))}
                                         </Select>
                                     </FormControl>
                                 </Grid>
                                 <Grid item xs={12} sx={{ display: 'flex', justifyContent: 'center' }}>
                                     <FormControl sx={{ width: 400 }} margin="normal">
-                                        <InputLabel>Responsable 2 (optionnel)</InputLabel>
+                                        <InputLabel id="responsable1-label">Responsable 1</InputLabel>
                                         <Select
-                                            value={networkForm.responsable2 || ''}
-                                            onChange={(e) => setNetworkForm({ ...networkForm, responsable2: e.target.value || null })}
+                                            labelId="responsable1-label"
+                                            value={networkForm.responsable1}
+                                            label="Responsable 1"
+                                            onChange={(e) => setNetworkForm({ ...networkForm, responsable1: e.target.value })}
+                                            required
                                         >
-                                            <MenuItem value="">Aucun</MenuItem>
-                                            {Array.isArray(members) && members.map((member) => (
-                                                <MenuItem key={member._id} value={member._id}>{member.username}</MenuItem>
+                                            <MenuItem value=""><em>Aucun</em></MenuItem>
+                                            {members.map((member) => (
+                                                <MenuItem key={member._id} value={member._id}>{member.username || member.pseudo || member.email}</MenuItem>
+                                            ))}
+                                        </Select>
+                                    </FormControl>
+                                </Grid>
+                                <Grid item xs={12} sx={{ display: 'flex', justifyContent: 'center' }}>
+                                    <FormControl sx={{ width: 400 }} margin="normal">
+                                        <InputLabel id="responsable2-label">Responsable 2</InputLabel>
+                                        <Select
+                                            labelId="responsable2-label"
+                                            value={networkForm.responsable2 || ''}
+                                            label="Responsable 2"
+                                            onChange={(e) => setNetworkForm({ ...networkForm, responsable2: e.target.value })}
+                                        >
+                                            <MenuItem value=""><em>Aucun</em></MenuItem>
+                                            {members.map((member) => (
+                                                <MenuItem key={member._id} value={member._id}>{member.username || member.pseudo || member.email}</MenuItem>
                                             ))}
                                         </Select>
                                     </FormControl>
@@ -434,7 +415,7 @@ const Networks = () => {
                     </DialogContent>
                     <DialogActions>
                         <Button onClick={() => setNetworkModal(false)}>Annuler</Button>
-                        <Button type="submit" variant="contained" color="primary">Créer</Button>
+                        <Button type="submit" variant="contained" color="primary">{editingNetworkId ? 'Modifier' : 'Créer'}</Button>
                     </DialogActions>
                 </form>
             </Dialog>
@@ -450,13 +431,13 @@ const Networks = () => {
 
             {/* Snackbar feedback */}
             <Snackbar
-                open={snackbar.open}
+                open={notification.open}
                 autoHideDuration={4000}
-                onClose={() => setSnackbar({ ...snackbar, open: false })}
+                onClose={hideNotification}
                 anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
             >
-                <Alert onClose={() => setSnackbar({ ...snackbar, open: false })} severity={snackbar.severity} sx={{ width: '100%' }}>
-                    {snackbar.message}
+                <Alert onClose={hideNotification} severity={notification.severity} sx={{ width: '100%' }}>
+                    {notification.message}
                 </Alert>
             </Snackbar>
         </Box>

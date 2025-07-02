@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Typography, Box, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, CircularProgress } from '@mui/material';
-
-const API_URL = process.env.REACT_APP_API_URL + '/api';
+import { apiService } from '../../../services/apiService';
 
 const NetworksRecap = () => {
   const [networks, setNetworks] = useState([]);
@@ -13,18 +12,12 @@ const NetworksRecap = () => {
       setLoading(true);
       setError(null);
       try {
-        const token = localStorage.getItem('token');
-        const res = await fetch(`${API_URL}/networks/stats`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        const data = await res.json();
-        if (res.ok && data.success) {
-          setNetworks(data.data);
-        } else {
-          setError(data.message || "Erreur lors du chargement des réseaux");
-        }
+        const res = await apiService.stats.getNetworks();
+        const data = res.data?.data || res.data || [];
+        setNetworks(Array.isArray(data) ? data : []);
       } catch (err) {
         setError("Erreur lors du chargement des réseaux");
+        setNetworks([]);
       } finally {
         setLoading(false);
       }

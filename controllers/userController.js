@@ -1,14 +1,23 @@
 const User = require('../models/User');
 const Group = require('../models/Group');
 const Network = require('../models/Network');
+const Church = require('../models/Church');
 
 // @desc    Obtenir tous les utilisateurs
 // @route   GET /api/users
 // @access  Private/Admin
 exports.getUsers = async (req, res) => {
     try {
-        // Filtrage dynamique sur tous les paramètres de la requête
-        const filter = { ...req.query };
+        // Filtrer les paramètres de requête autorisés pour éviter l'injection NoSQL
+        const allowedFields = ['role', 'genre', 'qualification', 'eglise_locale', 'departement', 'ville_residence', 'origine'];
+        const filter = {};
+        
+        Object.keys(req.query).forEach(key => {
+            if (allowedFields.includes(key)) {
+                filter[key] = req.query[key];
+            }
+        });
+
         const users = await User.find(filter)
             .populate('eglise_locale', 'nom')
             .populate('departement', 'nom')
@@ -22,7 +31,7 @@ exports.getUsers = async (req, res) => {
     } catch (error) {
         res.status(500).json({
             success: false,
-            message: error.message
+            message: 'Erreur lors de la récupération des utilisateurs'
         });
     }
 };
@@ -115,7 +124,10 @@ exports.getNonIsoles = async (req, res) => {
 exports.createUser = async (req, res) => {
     try {
         const user = await User.create(req.body);
-
+        // Incrémenter le nombre de membres de l'église si renseignée
+        if (user.eglise_locale) {
+            await Church.findByIdAndUpdate(user.eglise_locale, { $inc: { nombre_membres: 1 } });
+        }
         res.status(201).json({
             success: true,
             data: user
@@ -134,6 +146,9 @@ exports.createUser = async (req, res) => {
 // @access  Private/Admin
 exports.updateUser = async (req, res) => {
     try {
+        const userBefore = await User.findById(req.params.id);
+        const prevChurch = userBefore ? userBefore.eglise_locale : null;
+        const newChurch = req.body.eglise_locale;
         const user = await User.findByIdAndUpdate(
             req.params.id,
             req.body,
@@ -142,14 +157,21 @@ exports.updateUser = async (req, res) => {
                 runValidators: true
             }
         );
-
+        // Si l'église a changé, mettre à jour les compteurs
+        if (prevChurch && newChurch && prevChurch.toString() !== newChurch.toString()) {
+            await Church.findByIdAndUpdate(prevChurch, { $inc: { nombre_membres: -1 } });
+            await Church.findByIdAndUpdate(newChurch, { $inc: { nombre_membres: 1 } });
+        } else if (!prevChurch && newChurch) {
+            await Church.findByIdAndUpdate(newChurch, { $inc: { nombre_membres: 1 } });
+        } else if (prevChurch && !newChurch) {
+            await Church.findByIdAndUpdate(prevChurch, { $inc: { nombre_membres: -1 } });
+        }
         if (!user) {
             return res.status(404).json({
                 success: false,
                 message: 'Utilisateur non trouvé'
             });
         }
-
         res.status(200).json({
             success: true,
             data: user
@@ -168,16 +190,17 @@ exports.updateUser = async (req, res) => {
 exports.deleteUser = async (req, res) => {
     try {
         const user = await User.findById(req.params.id);
-
         if (!user) {
             return res.status(404).json({
                 success: false,
                 message: 'Utilisateur non trouvé'
             });
         }
-
+        // Décrémenter le nombre de membres de l'église si renseignée
+        if (user.eglise_locale) {
+            await Church.findByIdAndUpdate(user.eglise_locale, { $inc: { nombre_membres: -1 } });
+        }
         await user.deleteOne();
-
         res.status(200).json({
             success: true,
             data: {}

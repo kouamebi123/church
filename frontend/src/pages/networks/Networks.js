@@ -5,14 +5,19 @@ import {
   Paper, 
   Box, 
   Grid,
-  Button
+  Button,
+  MenuItem,
+  Select,
+  InputLabel,
+  FormControl
 } from '@mui/material';
 import { styled } from '@mui/material/styles';
 import Navbar from '../../components/Navbar';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
 import Loading from '../../components/Loading';
 import ErrorMessage from '../../components/ErrorMessage';
+import { apiService } from '../../services/apiService';
+import { useSelector } from 'react-redux';
 
 const NetworkCard = styled(Paper)(({ theme }) => ({
   padding: theme.spacing(3),
@@ -40,31 +45,44 @@ const InfoRow = styled(Box)(({ theme }) => ({
 
 const Networks = () => {
   const navigate = useNavigate();
+  const { user } = useSelector((state) => state.auth);
   const [networks, setNetworks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [churches, setChurches] = useState([]);
+  const [selectedChurch, setSelectedChurch] = useState('');
 
-  const API_URL = process.env.REACT_APP_API_URL + '/api';
+  useEffect(() => {
+    const fetchChurches = async () => {
+      try {
+        const res = await apiService.churches.getAll();
+        setChurches(res.data?.data || res.data || []);
+      } catch (err) {
+        setChurches([]);
+      }
+    };
+    if (user?.role === 'admin' || user?.role === 'super-admin') {
+      fetchChurches();
+    }
+  }, [user]);
 
   useEffect(() => {
     const fetchNetworks = async () => {
       try {
-        const token = localStorage.getItem('token');
-        const response = await axios.get(`${API_URL}/networks`, {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
+        let response;
+        if (user?.role === 'admin' || user?.role === 'super-admin') {
+          response = await apiService.networks.getAll(selectedChurch ? { churchId: selectedChurch } : {});
+        } else if (user?.eglise_locale) {
+          response = await apiService.networks.getAll({ churchId: user.eglise_locale });
+        } else {
+          response = await apiService.networks.getAll();
+        }
+        const networksData = response.data?.data || response.data || [];
 
         // Pour chaque réseau, récupérer ses stats via le bon endpoint
-        const networksData = response.data.data;
         const statsPromises = networksData.map(async (network) => {
           try {
-            const statsRes = await axios.get(`${API_URL}/networks/${network._id}/stats`, {
-              headers: {
-                'Authorization': `Bearer ${token}`
-              }
-            });
+            const statsRes = await apiService.networks.getStats(network._id);
             return { ...network, stats: statsRes.data };
           } catch (err) {
             // Si erreur, on garde le réseau sans stats
@@ -103,7 +121,7 @@ const Networks = () => {
     };
 
     fetchNetworks();
-  }, []);
+  }, [user, selectedChurch]);
 
   const calculateTotal = (network) => {
     return (
@@ -127,6 +145,24 @@ const Networks = () => {
         <Typography variant="h4" sx={{ mb: 4, color: 'primary.main', fontWeight: 'bold' }}>
           Gestion des Réseaux
         </Typography>
+        {(user?.role === 'admin' || user?.role === 'super-admin') && (
+          <Box sx={{ mb: 3, display: 'flex', justifyContent: 'center' }}>
+            <FormControl sx={{ minWidth: 250 }}>
+              <InputLabel id="church-select-label">Filtrer par église</InputLabel>
+              <Select
+                labelId="church-select-label"
+                value={selectedChurch}
+                label="Filtrer par église"
+                onChange={(e) => setSelectedChurch(e.target.value)}
+              >
+                <MenuItem value=""><em>Toutes les églises</em></MenuItem>
+                {churches.map((church) => (
+                  <MenuItem key={church._id} value={church._id}>{church.nom}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Box>
+        )}
         <Grid container>
           {networks.map((network) => (
             <Grid data-aos="fade-up" sx={{

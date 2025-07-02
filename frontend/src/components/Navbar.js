@@ -107,12 +107,11 @@ const Navbar = () => {
       {/* Navigation classique visible sur desktop */}
       <Box sx={{ display: { xs: 'none', md: 'flex' }, alignItems: 'center', gap: 3 }}>
         <Box sx={{ display: 'flex', gap: 2 }}>
-          {(user?.role === 'superviseur' || user?.role === 'admin' || user?.role === 'collecteur_reseaux') && (
+          {(user?.role === 'superviseur' || user?.role === 'admin' || user?.role === 'super-admin' || user?.role === 'collecteur_reseaux') && (
             <Button
               variant=""
               color="white"
               onClick={() => navigate('/networks')}
-
               sx={{
                 borderRadius: '20px',
                 textTransform: 'none',
@@ -165,7 +164,7 @@ const Navbar = () => {
                 transition: 'all 0.2s ease-in-out'
               }}
             >
-              {(user?.role === 'superviseur' || user?.role === 'admin') && (
+              {(user?.role === 'superviseur' || user?.role === 'admin' || user?.role === 'super-admin') && (
                 <MenuItem
                   onClick={() => navigate('/services/list')}
                   sx={{
@@ -179,7 +178,7 @@ const Navbar = () => {
                   Consulter les cultes
                 </MenuItem>
               )}
-              {(user?.role === 'collecteur_culte' || user?.role === 'admin') && (
+              {(user?.role === 'collecteur_culte' || user?.role === 'admin' || user?.role === 'super-admin') && (
                 <MenuItem
                   onClick={() => navigate('/services/new')}
                   sx={{
@@ -216,7 +215,7 @@ const Navbar = () => {
               anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
               transformOrigin={{ vertical: 'top', horizontal: 'right' }}
             >
-              {user && user.role === 'admin' && (
+              {user && (user.role === 'admin' || user.role === 'super-admin') && (
                 <MenuItem onClick={handleDashboard}>
                   <DashboardIcon sx={{ mr: 1 }} /> Dashboard
                 </MenuItem>
@@ -255,7 +254,7 @@ const Navbar = () => {
           </Box>
           <Divider />
           <List sx={{ p: 0 }}>
-            {(user?.role === 'superviseur' || user?.role === 'admin' || user?.role === 'collecteur_reseaux') && (
+            {(user?.role === 'superviseur' || user?.role === 'admin' || user?.role === 'super-admin' || user?.role === 'collecteur_reseaux') && (
               <ListItem disablePadding>
                 <ListItemButton onClick={() => navigate('/networks')} sx={{ py: 2 }}>
                   <ListItemIcon sx={{ minWidth: 36 }}>
@@ -288,7 +287,7 @@ const Navbar = () => {
 
             <Divider sx={{ my: 1 }} />
 
-            {user && user.role === 'admin' && (
+            {user && (user.role === 'admin' || user.role === 'super-admin') && (
               <ListItem disablePadding>
                 <ListItemButton onClick={handleDashboard} sx={{ py: 2 }}>
                   <ListItemIcon sx={{ minWidth: 36 }}>

@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
 import { format } from 'date-fns';
 import fr from 'date-fns/locale/fr';
 import {
@@ -40,6 +39,9 @@ import { TYPES_CULTE } from '../../constants/enums';
 import ErrorMessage from '../../components/ErrorMessage';
 import DeleteConfirmDialog from '../../components/DeleteConfirmDialog';
 import Loading from '../../components/Loading';
+import { useServices } from '../../hooks/useApi';
+import { useNotification } from '../../hooks/useNotification';
+import { apiService } from '../../services/apiService';
 
 const API_URL = process.env.REACT_APP_API_URL+ '/api';
 
@@ -63,17 +65,12 @@ const ServicesList = () => {
   const navigate = useNavigate();
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
-  const [services, setServices] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [token] = useState(localStorage.getItem('token'));
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editService, setEditService] = useState(null);
   const [collecteurs, setCollecteurs] = useState([]);
   const [superviseurs, setSuperviseurs] = useState([]);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [serviceToDelete, setServiceToDelete] = useState(null);
-  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
   const [filter, setFilter] = useState({
     type: '',
     date: '',
@@ -81,53 +78,46 @@ const ServicesList = () => {
     superviseur: ''
   });
 
+  const {
+    services,
+    loading,
+    error,
+    fetchServices,
+    createService,
+    updateService,
+    deleteService
+  } = useServices();
+
+  const {
+    notification,
+    showSuccess,
+    showError,
+    hideNotification
+  } = useNotification();
+
   const handleCloseDeleteDialog = () => {
     setDeleteDialogOpen(false);
     setServiceToDelete(null);
   };
 
-  const fetchServices = async () => {
+  const loadCollecteursAndSuperviseurs = async () => {
     try {
-      const response = await axios.get(`${API_URL}/services`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      setServices(response.data.data);
-      setLoading(false);
+      const [collecteursRes, superviseursRes] = await Promise.all([
+        apiService.users.getAll({ role: 'collecteur' }),
+        apiService.users.getAll({ role: 'superviseur' })
+      ]);
+      
+      setCollecteurs(collecteursRes.data?.data || collecteursRes.data || []);
+      setSuperviseurs(superviseursRes.data?.data || superviseursRes.data || []);
     } catch (err) {
-      setError(err.message);
-      setLoading(false);
+      console.error('Erreur lors du chargement des utilisateurs:', err);
     }
   };
 
   useEffect(() => {
     fetchServices();
-  }, [token]);
-
-  useEffect(() => {
-    const fetchUsers = async () => {
-      try {
-        const [collecteursResponse, superviseursResponse] = await Promise.all([
-          axios.get(`${API_URL}/users`, {
-            params: { role: 'collecteur_culte' },
-            headers: { 'Authorization': `Bearer ${token}` }
-          }),
-          axios.get(`${API_URL}/users`, {
-            params: { role: 'superviseur' },
-            headers: { 'Authorization': `Bearer ${token}` }
-          })
-        ]);
-
-        setCollecteurs(collecteursResponse.data.data);
-        setSuperviseurs(superviseursResponse.data.data);
-      } catch (err) {
-        console.error('Erreur lors de la récupération des utilisateurs:', err);
-      }
-    };
-
-    fetchUsers();
-  }, [token]);
+    loadCollecteursAndSuperviseurs();
+  }, [fetchServices]);
 
   const handleEditService = (service) => {
     setEditService(service);
@@ -160,23 +150,19 @@ const ServicesList = () => {
 
   const handleEditSubmit = async (values) => {
     try {
-      await axios.put(`${API_URL}/services/${editService._id}`, values, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
+      await updateService(editService._id, values);
       
       // Mettre à jour le service dans la liste
-      setServices(services.map(s => 
+      const updatedServices = services.map(s => 
         s._id === editService._id ? { ...s, ...values } : s
-      ));
+      );
+      fetchServices(updatedServices);
 
       handleEditClose();
-      setSnackbar({ open: true, message: 'Service modifié avec succès', severity: 'success' });
-      fetchServices();
+      showSuccess('Service modifié avec succès');
     } catch (error) {
       console.error('Erreur lors de la mise à jour du service:', error);
-      setSnackbar({ open: true, message: 'Erreur lors de la mise à jour du service', severity: 'error' });
+      showError('Erreur lors de la mise à jour du service');
     }
   };
 
@@ -242,22 +228,17 @@ const ServicesList = () => {
   const handleConfirmDeleteService = async () => {
     if (!serviceToDelete) return;
     try {
-      await axios.delete(`${API_URL}/services/${serviceToDelete._id}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      setServices(services.filter(service => service._id !== serviceToDelete._id));
-      setSnackbar({ open: true, message: 'Service supprimé avec succès', severity: 'success' });
+      await deleteService(serviceToDelete._id);
+      const updatedServices = services.filter(service => service._id !== serviceToDelete._id);
+      fetchServices(updatedServices);
+      showSuccess('Service supprimé avec succès');
     } catch (error) {
       console.error('Erreur lors de la suppression du service:', error);
-      setSnackbar({ open: true, message: 'Erreur lors de la suppression du service', severity: 'error' });
+      showError('Erreur lors de la suppression du service');
     } finally {
       handleCloseDeleteDialog();
     }
   };
-
-  
 
   if (loading) return <Loading titre="Chargement des données des services" />;
   if (error) return <ErrorMessage message={error} />;
@@ -582,13 +563,13 @@ const ServicesList = () => {
 
          {/* Snackbar feedback actions membres */}
               <Snackbar
-                open={snackbar.open}
+                open={notification.open}
                 autoHideDuration={2000}
-                onClose={() => setSnackbar({ ...snackbar, open: false })}
+                onClose={hideNotification}
                 anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
               >
-                <Alert onClose={() => setSnackbar({ ...snackbar, open: false })} severity={snackbar.severity} sx={{ width: '100%' }}>
-                  {snackbar.message}
+                <Alert onClose={hideNotification} severity={notification.severity} sx={{ width: '100%' }}>
+                  {notification.message}
                 </Alert>
               </Snackbar>
 

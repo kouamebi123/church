@@ -1,4 +1,3 @@
-
 import { Box, Typography, Button, TextField, TableCell, TableContainer, Table, TableHead, TableRow, Paper, TableBody, DialogActions, DialogContent, DialogTitle, IconButton, Dialog, Tooltip, Grid, FormControl, InputLabel, MenuItem, Select, Snackbar, Alert } from '@mui/material';
 import DeleteConfirmDialog from '../../DeleteConfirmDialog';
 import AddIcon from '@mui/icons-material/Add';
@@ -6,29 +5,42 @@ import SearchIcon from '@mui/icons-material/Search';
 import DeleteIcon from '@mui/icons-material/Delete';
 import LockResetIcon from '@mui/icons-material/LockReset';
 import PersonIcon from '@mui/icons-material/Person';
+import EditIcon from '@mui/icons-material/Edit';
 import { useState, useEffect } from 'react';
-import axios from 'axios';
-import { ROLE_OPTIONS } from '../../../constants/enums';
+import { ROLE_OPTIONS, QUALIFICATION_OPTIONS, GENRE_OPTIONS, TRANCHE_AGE_OPTIONS, SITUATION_MATRIMONIALE_OPTIONS, NIVEAU_EDUCATION_OPTIONS } from '../../../constants/enums';
 import Loading from '../../Loading';
 import ErrorMessage from '../../ErrorMessage';
-
-const API_URL = process.env.REACT_APP_API_URL + '/api';
+import { useUsers } from '../../../hooks/useApi';
+import { useNotification } from '../../../hooks/useNotification';
+import { apiService } from '../../../services/apiService';
+import { red } from '@mui/material/colors';
 
 const Membres = () => {
     // --- Ajout de l'état pour les groupes ---
     const [groups, setGroups] = useState([]);
     const [groupsError, setGroupsError] = useState(null);
-    const [members, setMembers] = useState([]);
-    const [membersError, setMembersError] = useState(null);
-    const [loading, setLoading] = useState(false);
-    const [memberModal, setMemberModal] = useState(false);
-    const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
     const [churches, setChurches] = useState([]);
     const [departments, setDepartments] = useState([]);
     const [loadingDepartments, setLoadingDepartments] = useState(false);
     const [departmentsError, setDepartmentsError] = useState(null);
     const [churchesError, setChurchesError] = useState(null);
 
+    const {
+        users: members,
+        loading,
+        error,
+        fetchUsers: loadMembers,
+        createUser,
+        updateUser,
+        deleteUser
+    } = useUsers();
+
+    const {
+        notification,
+        showSuccess,
+        showError,
+        hideNotification
+    } = useNotification();
 
     // Dialogs pour actions membres
     const [roleDialog, setRoleDialog] = useState({ open: false, member: null, role: '' });
@@ -36,13 +48,13 @@ const Membres = () => {
     const [deleteDialog, setDeleteDialog] = useState({ open: false, member: null });
     const [memberToDelete, setMemberToDelete] = useState(null);
     const [isolatedMembers, setIsolatedMembers] = useState([]);
-
-
+    const [memberModal, setMemberModal] = useState(false);
+    const [editMode, setEditMode] = useState(false);
+    const [memberToEdit, setMemberToEdit] = useState(null);
 
     const [memberForm, setMemberForm] = useState({
         username: '',
         pseudo: '',
-        password: '',
         role: 'membre',
         genre: '',
         tranche_age: '',
@@ -54,7 +66,7 @@ const Membres = () => {
         eglise_locale: '',
         sert_departement: 'Non',
         departement: '',
-        qualification: 'En integration',
+        qualification: 'En intégration',
         email: '',
         telephone: '',
         adresse: ''
@@ -62,26 +74,13 @@ const Membres = () => {
 
     const loadChurches = async () => {
         try {
-            const token = localStorage.getItem('token');
-            const response = await fetch(`${API_URL}/churches`, {
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
-            });
-            const result = await response.json();
-            if (response.ok) {
-                console.log('Churches:', result);
-                setChurches(result.data);
-                setChurchesError(null); // Réinitialiser l'erreur si le chargement réussit
-            } else {
-                throw new Error(result.message || 'Erreur lors du chargement des églises');
-            }
+            const response = await apiService.churches.getAll();
+            setChurches(response.data?.data || response.data || []);
+            setChurchesError(null);
         } catch (err) {
             console.error('Erreur lors du chargement des églises:', err);
-            setChurches([]); // Réinitialiser les églises en cas d'erreur
+            setChurches([]);
             setChurchesError('Erreur lors du chargement des églises');
-        } finally {
-            setLoading(false); // S'assurer que le loading est toujours désactivé
         }
     };
 
@@ -89,129 +88,119 @@ const Membres = () => {
     const loadDepartments = async () => {
         setLoadingDepartments(true);
         try {
-            const token = localStorage.getItem('token');
-            const response = await fetch(`${API_URL}/departments`, {
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
-            });
-            const result = await response.json();
-            if (response.ok && result.success) {
-                setDepartments(result.data);
-                setDepartmentsError(null); // Réinitialiser l'erreur si le chargement réussit
-            } else {
-                throw new Error(result.message || 'Erreur lors du chargement des départements');
-            }
+            const response = await apiService.departments.getAll();
+            setDepartments(response.data?.data || response.data || []);
+            setDepartmentsError(null);
         } catch (err) {
             setDepartmentsError('Erreur lors du chargement des départements');
-            setDepartments([]); // Réinitialiser les départements en cas d'erreur
+            setDepartments([]);
             console.error(err);
         } finally {
-            setLoadingDepartments(false); // S'assurer que le loading est désactivé
+            setLoadingDepartments(false);
         }
     };
-
-
-
 
     const handleGrantRights = (member) => {
         setRoleDialog({ open: true, member, role: member.role || '' });
     };
+
     const handleRoleChange = (e) => {
         setRoleDialog(prev => ({ ...prev, role: e.target.value }));
     };
+
     const handleRoleSubmit = async () => {
         try {
-            const token = localStorage.getItem('token');
-            await axios.put(`${API_URL}/users/${roleDialog.member._id}`, { role: roleDialog.role }, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
-            setSnackbar({ open: true, message: 'Rôle mis à jour', severity: 'success' });
+            await updateUser(roleDialog.member._id, { role: roleDialog.role });
+            showSuccess('Rôle mis à jour');
             setRoleDialog({ open: false, member: null, role: '' });
             await loadMembers();
         } catch (err) {
-            setSnackbar({ open: true, message: "Erreur lors de l'attribution du rôle", severity: 'error' });
+            showError("Erreur lors de l'attribution du rôle");
         }
     };
 
     const handleResetPassword = async (member) => {
         setResetDialog({ open: true, member, newPassword: '...' });
         try {
-            const token = localStorage.getItem('token');
-            // Appel API pour reset le mot de passe
-            const res = await axios.post(`${API_URL}/users/${member._id}/reset-password`, {}, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
+            const res = await apiService.users.resetPassword(member._id);
             setResetDialog({ open: true, member, newPassword: res.data?.newPassword || 'N/A' });
-            setSnackbar({ open: true, message: 'Mot de passe réinitialisé', severity: 'success' });
+            showSuccess('Mot de passe réinitialisé');
         } catch (err) {
-            setSnackbar({ open: true, message: 'Erreur lors de la réinitialisation', severity: 'error' });
+            showError('Erreur lors de la réinitialisation');
             setResetDialog({ open: false, member: null, newPassword: '' });
         }
     };
+
     const handleCloseResetDialog = () => setResetDialog({ open: false, member: null, newPassword: '' });
 
     const handleDeleteMember = (member) => {
         setDeleteDialog({ open: true, member });
     };
+
     const handleConfirmDelete = async () => {
         try {
-            const token = localStorage.getItem('token');
-            await axios.delete(`${API_URL}/users/${deleteDialog.member._id}`, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
-            setSnackbar({ open: true, message: 'Membre supprimé', severity: 'success' });
+            await deleteUser(deleteDialog.member._id);
+            showSuccess('Membre supprimé');
             setDeleteDialog({ open: false, member: null });
             await loadMembers();
         } catch (err) {
-            setSnackbar({ open: true, message: 'Erreur lors de la suppression', severity: 'error' });
+            showError('Erreur lors de la suppression');
         }
     };
+
     const handleCloseDeleteDialog = () => setDeleteDialog({ open: false, member: null });
+
+    const handleEditMember = (member) => {
+        setEditMode(true);
+        setMemberToEdit(member);
+        setMemberForm({
+            ...member,
+            eglise_locale: member.eglise_locale?._id || member.eglise_locale || '',
+            departement: member.departement?._id || member.departement || '',
+        });
+        setMemberModal(true);
+    };
 
     const handleMemberSubmit = async (e) => {
         e.preventDefault();
+        const dataToSend = {
+            ...memberForm,
+            departement: memberForm.departement === '' ? null : memberForm.departement
+        };
         try {
-            const token = localStorage.getItem('token');
-            const response = await fetch(`${API_URL}/users`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify(memberForm)
-            });
-            if (response.ok) {
-                setMemberModal(false);
-                loadMembers();
-            }
-        } catch (err) {
-            console.error('Erreur lors de la création du membre:', err);
-        }
-    };
-
-
-    // Fonction pour charger les membres
-    const loadMembers = async () => {
-        //setLoading(true);
-        try {
-            const token = localStorage.getItem('token');
-            const response = await fetch(`${API_URL}/users`, {
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
-            });
-            const result = await response.json();
-            if (response.ok && result.success) {
-                setMembers(result.data);
+            if (editMode && memberToEdit) {
+                await updateUser(memberToEdit._id, dataToSend);
+                showSuccess('Membre mis à jour avec succès');
             } else {
-                throw new Error(result.message || 'Erreur lors du chargement des membres');
+                await createUser(dataToSend);
+                showSuccess('Membre créé avec succès');
             }
+            setMemberModal(false);
+            setEditMode(false);
+            setMemberToEdit(null);
+            setMemberForm({
+                username: '',
+                pseudo: '',
+                role: 'membre',
+                genre: '',
+                tranche_age: '',
+                profession: '',
+                ville_residence: '',
+                origine: '',
+                situation_matrimoniale: '',
+                niveau_education: '',
+                eglise_locale: '',
+                sert_departement: 'Non',
+                departement: '',
+                qualification: 'En intégration',
+                email: '',
+                telephone: '',
+                adresse: ''
+            });
+            await loadMembers();
         } catch (err) {
-            setMembersError('Erreur lors du chargement des membres');
-            console.error(err);
-        } finally {
-            setLoading(false);
+            showError('Erreur lors de la sauvegarde du membre');
+            console.error('Erreur lors de la sauvegarde du membre:', err);
         }
     };
 
@@ -220,22 +209,13 @@ const Membres = () => {
         loadChurches();
         loadGroups();
         loadIsolatedMembers();
+        loadDepartments();
     }, []);
 
     const loadIsolatedMembers = async () => {
         try {
-            const token = localStorage.getItem('token');
-            const response = await fetch(`${API_URL}/users/isoles`, {
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
-            });
-            const result = await response.json();
-            if (response.ok && result.success) {
-                setIsolatedMembers(result.data);
-            } else {
-                throw new Error(result.message || 'Erreur lors du chargement des membres non isolés');
-            }
+            const response = await apiService.users.getIsoles();
+            setIsolatedMembers(response.data?.data || response.data || []);
         } catch (err) {
             console.error('Erreur lors du chargement des membres non isolés:', err);
         }
@@ -244,19 +224,9 @@ const Membres = () => {
     // Fonction pour charger les groupes
     const loadGroups = async () => {
         try {
-            const token = localStorage.getItem('token');
-            const response = await fetch(`${API_URL}/groups`, {
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
-            });
-            const result = await response.json();
-            if (response.ok) {
-                setGroups(result.data);
-                setGroupsError(null);
-            } else {
-                throw new Error(result.message || 'Erreur lors du chargement des groupes');
-            }
+            const response = await apiService.groups.getAll();
+            setGroups(response.data?.data || response.data || []);
+            setGroupsError(null);
         } catch (err) {
             setGroupsError('Erreur lors du chargement des groupes');
             setGroups([]);
@@ -344,8 +314,8 @@ const Membres = () => {
             />
             {loading ? (
                 <Loading titre="Chargement des membres..." />
-            ) : membersError ? (
-                <ErrorMessage error={membersError} />
+            ) : error ? (
+                <ErrorMessage error={error} />
             ) : (
                 <>
                     {/* Affichage de l'effectif filtré */}
@@ -393,6 +363,11 @@ const Membres = () => {
                                             <Tooltip title="Réinitialiser le mot de passe">
                                                 <IconButton size="small" color="secondary" onClick={() => handleResetPassword(member)}>
                                                     <LockResetIcon />
+                                                </IconButton>
+                                            </Tooltip>
+                                            <Tooltip title="Modifier">
+                                                <IconButton size="small" color="info" onClick={() => handleEditMember(member)}>
+                                                    <EditIcon />
                                                 </IconButton>
                                             </Tooltip>
                                             <Tooltip title="Supprimer">
@@ -489,7 +464,30 @@ const Membres = () => {
 
             <Dialog
                 open={memberModal}
-                onClose={() => setMemberModal(false)}
+                onClose={() => {
+                    setMemberModal(false);
+                    setEditMode(false);
+                    setMemberToEdit(null);
+                    setMemberForm({
+                        username: '',
+                        pseudo: '',
+                        role: 'membre',
+                        genre: '',
+                        tranche_age: '',
+                        profession: '',
+                        ville_residence: '',
+                        origine: '',
+                        situation_matrimoniale: '',
+                        niveau_education: '',
+                        eglise_locale: '',
+                        sert_departement: 'Non',
+                        departement: '',
+                        qualification: 'En intégration',
+                        email: '',
+                        telephone: '',
+                        adresse: ''
+                    });
+                }}
                 maxWidth="md"
                 fullWidth
                 PaperProps={{
@@ -500,7 +498,7 @@ const Membres = () => {
                     }
                 }}
             >
-                <DialogTitle>Nouveau membre</DialogTitle>
+                <DialogTitle>{editMode ? 'Modifier le membre' : 'Nouveau membre'}</DialogTitle>
                 <form onSubmit={handleMemberSubmit}>
                     <DialogContent sx={{ display: 'flex', justifyContent: 'center' }}>
                         <Box sx={{
@@ -541,17 +539,6 @@ const Membres = () => {
                                     />
                                 </Grid>
                                 <Grid item xs={12} sm={6} sx={{ display: 'flex', justifyContent: 'center' }}>
-                                    <TextField
-                                        sx={{ width: 350 }}
-                                        type="password"
-                                        label="Mot de passe"
-                                        value={memberForm.password}
-                                        onChange={(e) => setMemberForm({ ...memberForm, password: e.target.value })}
-                                        margin="normal"
-                                        required
-                                    />
-                                </Grid>
-                                <Grid item xs={12} sm={6} sx={{ display: 'flex', justifyContent: 'center' }}>
                                     <FormControl sx={{ width: 350 }} margin="normal" required>
                                         <InputLabel>Genre</InputLabel>
                                         <Select
@@ -559,9 +546,9 @@ const Membres = () => {
                                             value={memberForm.genre}
                                             onChange={(e) => setMemberForm({ ...memberForm, genre: e.target.value })}
                                         >
-                                            <MenuItem value="Homme">Homme</MenuItem>
-                                            <MenuItem value="Femme">Femme</MenuItem>
-                                            <MenuItem value="Enfant">Enfant</MenuItem>
+                                            {GENRE_OPTIONS.map((genre) => (
+                                                <MenuItem key={genre.value} value={genre.value}>{genre.label}</MenuItem>
+                                            ))}
                                         </Select>
                                     </FormControl>
                                 </Grid>
@@ -576,15 +563,9 @@ const Membres = () => {
                                             value={memberForm.tranche_age}
                                             onChange={(e) => setMemberForm({ ...memberForm, tranche_age: e.target.value })}
                                         >
-                                            <MenuItem value="0 - 2 ans">0 - 2 ans</MenuItem>
-                                            <MenuItem value="2 - 6 ans">2 - 6 ans</MenuItem>
-                                            <MenuItem value="7 - 12 ans">7 - 12 ans</MenuItem>
-                                            <MenuItem value="13 - 18 ans">13 - 18 ans</MenuItem>
-                                            <MenuItem value="19 - 25 ans">19 - 25 ans</MenuItem>
-                                            <MenuItem value="26 - 35 ans">26 - 35 ans</MenuItem>
-                                            <MenuItem value="36 - 55 ans">36 - 55 ans</MenuItem>
-                                            <MenuItem value="56 - 85 ans">56 - 85 ans</MenuItem>
-                                            <MenuItem value="85 ans et plus">85 ans et plus</MenuItem>
+                                            {TRANCHE_AGE_OPTIONS.map((tranche) => (
+                                                <MenuItem key={tranche.value} value={tranche.value}>{tranche.label}</MenuItem>
+                                            ))}
                                         </Select>
                                     </FormControl>
                                 </Grid>
@@ -626,10 +607,9 @@ const Membres = () => {
                                             value={memberForm.situation_matrimoniale}
                                             onChange={(e) => setMemberForm({ ...memberForm, situation_matrimoniale: e.target.value })}
                                         >
-                                            <MenuItem value="Marié(e)">Marié(e)</MenuItem>
-                                            <MenuItem value="Célibataire">Célibataire</MenuItem>
-                                            <MenuItem value="Veuf(ve)">Veuf(ve)</MenuItem>
-                                            <MenuItem value="Divorcé(e)">Divorcé(e)</MenuItem>
+                                            {SITUATION_MATRIMONIALE_OPTIONS.map((situation) => (
+                                                <MenuItem key={situation.value} value={situation.value}>{situation.label}</MenuItem>
+                                            ))}
                                         </Select>
                                     </FormControl>
                                 </Grid>
@@ -643,13 +623,9 @@ const Membres = () => {
                                             value={memberForm.niveau_education}
                                             onChange={(e) => setMemberForm({ ...memberForm, niveau_education: e.target.value })}
                                         >
-                                            <MenuItem value="Aucun diplôme ou certificat d'études primaires">Aucun diplôme ou certificat d'études primaires</MenuItem>
-                                            <MenuItem value="Brevet des collèges">Brevet des collèges</MenuItem>
-                                            <MenuItem value="CAP, BEP ou équivalent">CAP, BEP ou équivalent</MenuItem>
-                                            <MenuItem value="Baccalauréat, brevet professionnel ou équivalent">Baccalauréat, brevet professionnel ou équivalent</MenuItem>
-                                            <MenuItem value="Diplôme du supérieur court (niveau bac + 2)">Diplôme du supérieur court (niveau bac + 2)</MenuItem>
-                                            <MenuItem value="Diplôme du supérieur long (bac + 2 ⇔ bac + 5)">Diplôme du supérieur long (bac + 2 ⇔ bac + 5)</MenuItem>
-                                            <MenuItem value="Diplôme du supérieur long (supérieur à bac + 5)">Diplôme du supérieur long (supérieur à bac + 5)</MenuItem>
+                                            {NIVEAU_EDUCATION_OPTIONS.map((niveau) => (
+                                                <MenuItem key={niveau.value} value={niveau.value}>{niveau.label}</MenuItem>
+                                            ))}
                                         </Select>
                                     </FormControl>
                                 </Grid>
@@ -670,34 +646,46 @@ const Membres = () => {
                                         </Select>
                                     </FormControl>
                                 </Grid>
-                                <Grid item xs={12} sm={6} sx={{ display: 'flex', justifyContent: 'center' }}>
-                                    <FormControl sx={{ width: 350 }} margin="normal" required>
-                                        <InputLabel>Sert dans un département</InputLabel>
-                                        <Select
-                                            sx={{ minWidth: 350 }}
-                                            value={memberForm.sert_departement}
-                                            onChange={(e) => setMemberForm({ ...memberForm, sert_departement: e.target.value, departement: e.target.value === 'Non' ? '' : memberForm.departement })}
-                                        >
-                                            <MenuItem value="Oui">Oui</MenuItem>
-                                            <MenuItem value="Non">Non</MenuItem>
-                                        </Select>
-                                    </FormControl>
-                                </Grid>
-                                <Grid item xs={12} sm={6} sx={{ display: 'flex', justifyContent: 'center' }}>
-                                    <FormControl sx={{ width: 350 }} margin="normal" required>
-                                        <InputLabel>Département</InputLabel>
-                                        <Select
-                                            sx={{ minWidth: 350 }}
-                                            value={memberForm.departement}
-                                            onChange={(e) => setMemberForm({ ...memberForm, departement: e.target.value })}
-                                            disabled={memberForm.sert_departement !== 'Oui'}
-                                        >
-                                            {Array.isArray(departments) && departments.map((dept) => (
-                                                <MenuItem key={dept._id} value={dept._id}>{dept.name}</MenuItem>
-                                            ))}
-                                        </Select>
-                                    </FormControl>
-                                </Grid>
+                                {/* Sert dans un département : seulement en création */}
+                                {!editMode && (
+                                    <Grid item xs={12} sm={6} sx={{ display: 'flex', justifyContent: 'center' }}>
+                                        <FormControl sx={{ width: 350 }} margin="normal" required>
+                                            <InputLabel>Sert dans un département</InputLabel>
+                                            <Select
+                                                sx={{ minWidth: 350 }}
+                                                value={memberForm.sert_departement}
+                                                onChange={(e) => setMemberForm({ ...memberForm, sert_departement: e.target.value, departement: e.target.value === 'Non' ? '' : memberForm.departement })}
+                                            >
+                                                <MenuItem value="Oui">Oui</MenuItem>
+                                                <MenuItem value="Non">Non</MenuItem>
+                                            </Select>
+                                        </FormControl>
+                                    </Grid>
+                                )}
+                                {/* Département : toujours affiché en modification, ou si sert_departement === 'Oui' en création */}
+                                {(editMode || memberForm.sert_departement === 'Oui') && (
+                                    <Grid item xs={12} sm={6} sx={{ display: 'flex', justifyContent: 'center' }}>
+                                        <FormControl sx={{ width: 350 }} margin="normal">
+                                            <InputLabel>Département</InputLabel>
+                                            <Select
+                                                sx={{ minWidth: 350 }}
+                                                value={memberForm.departement}
+                                                onChange={(e) => setMemberForm({ ...memberForm, departement: e.target.value })}
+                                            >
+                                                <MenuItem value="">Ne sert plus</MenuItem>
+                                                {departmentsError && (
+                                                    <Alert severity="error">{departmentsError}</Alert>
+                                                )}
+                                                {departments.length === 0 && !departmentsError && (
+                                                    <Alert severity="info">Aucun département trouvé</Alert>
+                                                )}
+                                                {Array.isArray(departments) && departments.map((dept) => (
+                                                    <MenuItem key={dept._id} value={dept._id}>{dept.nom}</MenuItem>
+                                                ))}
+                                            </Select>
+                                        </FormControl>
+                                    </Grid>
+                                )}
                                 <Grid item xs={12} sm={6} sx={{ display: 'flex', justifyContent: 'center' }}>
                                     <FormControl sx={{ width: 350 }} margin="normal" required>
                                         <InputLabel>Qualification</InputLabel>
@@ -706,14 +694,9 @@ const Membres = () => {
                                             value={memberForm.qualification}
                                             onChange={(e) => setMemberForm({ ...memberForm, qualification: e.target.value })}
                                         >
-                                            <MenuItem value="12">12</MenuItem>
-                                            <MenuItem value="144">144</MenuItem>
-                                            <MenuItem value="1728">1728</MenuItem>
-                                            <MenuItem value="Leader">Leader</MenuItem>
-                                            <MenuItem value="Responsable reseau">Responsable réseau</MenuItem>
-                                            <MenuItem value="Regulier">Régulier</MenuItem>
-                                            <MenuItem value="Irregulier">Irrégulier</MenuItem>
-                                            <MenuItem value="En integration">En intégration</MenuItem>
+                                            {QUALIFICATION_OPTIONS.map((qual) => (
+                                                <MenuItem key={qual.value} value={qual.value}>{qual.label}</MenuItem>
+                                            ))}
                                         </Select>
                                     </FormControl>
                                 </Grid>
@@ -758,7 +741,7 @@ const Membres = () => {
                     </DialogContent>
                     <DialogActions>
                         <Button onClick={() => setMemberModal(false)}>Annuler</Button>
-                        <Button type="submit" variant="contained" color="primary">Créer</Button>
+                        <Button type="submit" variant="contained" color="primary">{editMode ? 'Mettre à jour' : 'Créer'}</Button>
                     </DialogActions>
                 </form>
             </Dialog>
@@ -773,13 +756,13 @@ const Membres = () => {
 
             {/* Snackbar feedback */}
             <Snackbar
-                open={snackbar.open}
+                open={notification.open}
                 autoHideDuration={4000}
-                onClose={() => setSnackbar({ ...snackbar, open: false })}
+                onClose={hideNotification}
                 anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
             >
-                <Alert onClose={() => setSnackbar({ ...snackbar, open: false })} severity={snackbar.severity} sx={{ width: '100%' }}>
-                    {snackbar.message}
+                <Alert onClose={hideNotification} severity={notification.severity} sx={{ width: '100%' }}>
+                    {notification.message}
                 </Alert>
             </Snackbar>
         </Box>

@@ -68,6 +68,7 @@ export const TYPES_CULTE_OPTIONS = [
 
 export const ROLE_OPTIONS = [
   { value: 'admin', label: 'Admin' },
+  { value: 'super-admin', label: 'Super Admin' },
   { value: 'superviseur', label: 'Superviseur' },
   { value: 'collecteur_reseaux', label: 'Collecteur réseau' },
   { value: 'collecteur_culte', label: 'Collecteur culte' },

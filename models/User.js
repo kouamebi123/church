@@ -17,7 +17,7 @@ const userSchema = new mongoose.Schema({
     },
     role: {
         type: String,
-        enum: ['admin', 'superviseur', 'collecteur_reseaux', 'collecteur_culte', 'membre','gouvernance'],
+        enum: ['admin', 'super-admin', 'superviseur', 'collecteur_reseaux', 'collecteur_culte', 'membre','gouvernance'],
         default: 'membre'
     },
     genre: {
@@ -61,12 +61,12 @@ const userSchema = new mongoose.Schema({
         type: String,
         enum: [
             '12', '144', '1728', 'Leader',
-            'Responsable réseau', 'Responsable reseau',
-            'Régulier', 'régulier', 'Regulier', 'regulier',
-            'Irrégulier', 'irregulier', 'Irrégulier', 'irregulier',
-            'En intégration', 'en integration', 'En integration', 'en intégration',
-            'Gouvernance', 'gouvernance',
-            'Ecodim', 'ecodim','Responsable ecodim','responsable ecodim'
+            'Responsable réseau', 'Responsable de département',
+            'Régulier',
+            'Irrégulier',
+            'En intégration',
+            'Gouvernance',
+            'Ecodim','Responsable Ecodim',
         ],
         default: 'En intégration'
     },

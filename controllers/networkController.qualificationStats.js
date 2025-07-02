@@ -33,7 +33,7 @@ exports.getNetworksQualificationStats = async (req, res) => {
                 ...categories
             };
         }));
-        res.status(200).json({ success: true, data: result });
+        res.status(200).json({ data: result });
     } catch (error) {
         res.status(500).json({ success: false, message: error.message });
     }

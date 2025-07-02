@@ -33,7 +33,8 @@ import {
   Collections as CollectionsIcon,
   InsertChart as InsertChartIcon,
   ReplyAllOutlined as ReplyAllOutlinedIcon,
-  LanOutlined as LanOutlinedIcon
+  LanOutlined as LanOutlinedIcon,
+  Map as MapIcon
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
@@ -49,6 +50,7 @@ import UsersRetired from '../components/dashboard/sections/UsersRetired';
 import Churches from '../components/dashboard/sections/Churches';
 import Departments from '../components/dashboard/sections/Departments';
 import StatsMembres from '../components/dashboard/sections/StatsMembres';
+import MissionImplantation from '../components/dashboard/sections/MissionImplantation';
 
 
 
@@ -112,34 +114,48 @@ const Dashboard = () => {
 
   const navigate = useNavigate();
 
-  // Rendu conditionnel de la section active
+  // Rendu conditionnel de la section active avec composants montés
   const renderSection = () => {
-    switch (activeSection) {
-      case 'stats':
-        return <Stats />;
-      case 'statsReseaux':
-        return <StatsReseaux />;
-      case 'statsCultes':
-        return <StatsCultes />;
-      case 'networks':
-        return <Networks />;
-      case 'networksRecap':
-        return <NetworksRecap />;
-      case 'carousel':
-        return <Carousel />;
-      case 'users':
-        return <Membres />;
-      case 'usersRetired':
-        return <UsersRetired />;
-      case 'churches':
-        return <Churches />;
-      case 'departments':
-        return <Departments />;
-      case 'statsMembres':
-        return <StatsMembres />;
-      default:
-        return null;
-    }
+    return (
+      <Box>
+        <Box sx={{ display: activeSection === 'stats' ? 'block' : 'none' }}>
+          <Stats />
+        </Box>
+        <Box sx={{ display: activeSection === 'statsReseaux' ? 'block' : 'none' }}>
+          <StatsReseaux />
+        </Box>
+        <Box sx={{ display: activeSection === 'statsCultes' ? 'block' : 'none' }}>
+          <StatsCultes />
+        </Box>
+        <Box sx={{ display: activeSection === 'statsMembres' ? 'block' : 'none' }}>
+          <StatsMembres />
+        </Box>
+        <Box sx={{ display: activeSection === 'networks' ? 'block' : 'none' }}>
+          <Networks />
+        </Box>
+        <Box sx={{ display: activeSection === 'networksRecap' ? 'block' : 'none' }}>
+          <NetworksRecap />
+        </Box>
+        <Box sx={{ display: activeSection === 'carousel' ? 'block' : 'none' }}>
+          <Carousel />
+        </Box>
+        <Box sx={{ display: activeSection === 'users' ? 'block' : 'none' }}>
+          <Membres />
+        </Box>
+        <Box sx={{ display: activeSection === 'usersRetired' ? 'block' : 'none' }}>
+          <UsersRetired />
+        </Box>
+        <Box sx={{ display: activeSection === 'churches' ? 'block' : 'none' }}>
+          <Churches />
+        </Box>
+        <Box sx={{ display: activeSection === 'departments' ? 'block' : 'none' }}>
+          <Departments />
+        </Box>
+        <Box sx={{ display: activeSection === 'missionImplantation' ? 'block' : 'none' }}>
+          <MissionImplantation active={activeSection === 'missionImplantation'} />
+        </Box>
+      </Box>
+    );
   };
 
 
@@ -185,6 +201,13 @@ const Dashboard = () => {
       children: [
         { id: 'users', text: 'Gestion des membres', icon: <PeopleIcon /> },
         { id: 'usersRetired', text: 'Membres retirés', icon: <PeopleAltIcon /> },
+      ]
+    },
+    {
+      text: 'Mission et Implantation',
+      icon: <MapIcon />,
+      children: [
+        { id: 'missionImplantation', text: 'Carte interactive', icon: <MapIcon /> },
       ]
     },
     {

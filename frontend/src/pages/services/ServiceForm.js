@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useFormik } from 'formik';
 import * as Yup from 'yup';
-import axios from 'axios';
 import { useNavigate } from 'react-router-dom';
 import {
   Paper,
@@ -18,6 +17,8 @@ import SuccessDialog from '../../components/layout/SuccessDialog';
 import { format } from 'date-fns';
 import ErrorMessage from '../../components/ErrorMessage';
 import { TYPES_CULTE_OPTIONS } from '../../constants/enums';
+import { apiService } from '../../services/apiService';
+import { useNotification } from '../../hooks/useNotification';
 
 const validationSchema = Yup.object({
   culte: Yup.string().required('Le type de culte est requis'),
@@ -32,37 +33,38 @@ const validationSchema = Yup.object({
   total_animateurs_ecodim: Yup.number().min(0, 'Le nombre doit être positif').required('Le nombre d\'animateurs ECODIM est requis'),
   total_enfants_ecodim: Yup.number().min(0, 'Le nombre doit être positif').required('Le nombre d\'enfants ECODIM est requis'),
   collecteur_culte: Yup.string().required('Le collecteur est requis'),
-  superviseur: Yup.string().required('Le superviseur est requis')
+  superviseur: Yup.string().required('Le superviseur est requis'),
+  invitationYoutube: Yup.number().min(0, 'Le nombre doit être positif'),
+  invitationTiktok: Yup.number().min(0, 'Le nombre doit être positif'),
+  invitationInstagram: Yup.number().min(0, 'Le nombre doit être positif'),
+  invitationPhysique: Yup.number().min(0, 'Le nombre doit être positif')
 });
-
-const API_URL = process.env.REACT_APP_API_URL+ '/api';
 
 const ServiceForm = () => {
   const [successDialogOpen, setSuccessDialogOpen] = useState(false);
   const navigate = useNavigate();
-  const token = localStorage.getItem('token');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [superviseurs, setSuperviseurs] = useState([]);
   const [collecteurs, setCollecteurs] = useState([]);
-  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
+
+  const {
+    notification,
+    showSuccess,
+    showError,
+    hideNotification
+  } = useNotification();
 
   useEffect(() => {
     const fetchUsers = async () => {
       try {
         // Récupérer les superviseurs
-        const superviseursResponse = await axios.get(`${API_URL}/users`, {
-          params: { role: 'superviseur' },
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        setSuperviseurs(superviseursResponse.data.data);
+        const superviseursResponse = await apiService.users.getAll({ role: 'superviseur' });
+        setSuperviseurs(superviseursResponse.data?.data || superviseursResponse.data || []);
 
         // Récupérer les collecteurs
-        const collecteursResponse = await axios.get(`${API_URL}/users`, {
-          params: { role: 'collecteur_culte' },
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        setCollecteurs(collecteursResponse.data.data);
+        const collecteursResponse = await apiService.users.getAll({ role: 'collecteur_culte' });
+        setCollecteurs(collecteursResponse.data?.data || collecteursResponse.data || []);
 
         setLoading(false);
       } catch (err) {
@@ -72,7 +74,7 @@ const ServiceForm = () => {
     };
 
     fetchUsers();
-  }, [token]);
+  }, []);
 
   const formik = useFormik({
     initialValues: {
@@ -88,7 +90,11 @@ const ServiceForm = () => {
       total_animateurs_ecodim: '',
       total_enfants_ecodim: '',
       collecteur_culte: '',
-      superviseur: ''
+      superviseur: '',
+      invitationYoutube: 0,
+      invitationTiktok: 0,
+      invitationInstagram: 0,
+      invitationPhysique: 0
     },
     validationSchema,
     onSubmit: async (values) => {
@@ -103,26 +109,23 @@ const ServiceForm = () => {
           total_multimedia: Number(values.total_multimedia),
           total_respo_ecodim: Number(values.total_respo_ecodim),
           total_animateurs_ecodim: Number(values.total_animateurs_ecodim),
-          total_enfants_ecodim: Number(values.total_enfants_ecodim)
+          total_enfants_ecodim: Number(values.total_enfants_ecodim),
+          invitationYoutube: Number(values.invitationYoutube),
+          invitationTiktok: Number(values.invitationTiktok),
+          invitationInstagram: Number(values.invitationInstagram),
+          invitationPhysique: Number(values.invitationPhysique)
         };
 
         console.log(formattedValues);
 
-        await axios.post(`${API_URL}/services`, formattedValues, {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        });
-        setSuccessDialogOpen(true); // Affiche le dialog de succès
-        // navigate('/services'); // Laisse l'utilisateur fermer le dialog d'abord
+        await apiService.services.create(formattedValues);
+        setSuccessDialogOpen(true);
       } catch (error) {
         console.error('Erreur lors de la création du service:', error);
-        setSnackbar({ open: true, message: error.response?.data?.message || 'Erreur lors de la création du service', severity: 'error' });
+        showError(error.message || 'Erreur lors de la création du service');
       }
     }
   });
-
-  
 
   if (loading) return <div>Chargement...</div>;
   if (error) return <ErrorMessage error={error} />;
@@ -329,6 +332,58 @@ const ServiceForm = () => {
             </TextField>
           </Grid>
 
+          <Grid item xs={12} sm={6}>
+            <TextField sx={{ minWidth: 250, backgroundColor: '#fdfdfd' }}
+              fullWidth
+              name="invitationYoutube"
+              label="Invitations Youtube"
+              type="number"
+              value={formik.values.invitationYoutube}
+              onChange={formik.handleChange}
+              error={formik.touched.invitationYoutube && Boolean(formik.errors.invitationYoutube)}
+              helperText={formik.touched.invitationYoutube && formik.errors.invitationYoutube}
+            />
+          </Grid>
+
+          <Grid item xs={12} sm={6}>
+            <TextField sx={{ minWidth: 250, backgroundColor: '#fdfdfd' }}
+              fullWidth
+              name="invitationTiktok"
+              label="Invitations Tiktok"
+              type="number"
+              value={formik.values.invitationTiktok}
+              onChange={formik.handleChange}
+              error={formik.touched.invitationTiktok && Boolean(formik.errors.invitationTiktok)}
+              helperText={formik.touched.invitationTiktok && formik.errors.invitationTiktok}
+            />
+          </Grid>
+
+          <Grid item xs={12} sm={6}>
+            <TextField sx={{ minWidth: 250, backgroundColor: '#fdfdfd' }}
+              fullWidth
+              name="invitationInstagram"
+              label="Invitations Instagram"
+              type="number"
+              value={formik.values.invitationInstagram}
+              onChange={formik.handleChange}
+              error={formik.touched.invitationInstagram && Boolean(formik.errors.invitationInstagram)}
+              helperText={formik.touched.invitationInstagram && formik.errors.invitationInstagram}
+            />
+          </Grid>
+
+          <Grid item xs={12} sm={6}>
+            <TextField sx={{ minWidth: 250, backgroundColor: '#fdfdfd' }}
+              fullWidth
+              name="invitationPhysique"
+              label="Invitations Physiques"
+              type="number"
+              value={formik.values.invitationPhysique}
+              onChange={formik.handleChange}
+              error={formik.touched.invitationPhysique && Boolean(formik.errors.invitationPhysique)}
+              helperText={formik.touched.invitationPhysique && formik.errors.invitationPhysique}
+            />
+          </Grid>
+
           <Grid item xs={12}>
             <Box display="flex" justifyContent="flex-end" gap={2} sx={{ mt: 1, right: 0 }}>
               <Button
@@ -354,18 +409,6 @@ const ServiceForm = () => {
         title="Succès"
         content="Le culte a été enregistré avec succès !"
       />
-
-      {/* Snackbar feedback actions membres */}
-      <Snackbar
-        open={snackbar.open}
-        autoHideDuration={2000}
-        onClose={() => setSnackbar({ ...snackbar, open: false })}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-      >
-        <Alert onClose={() => setSnackbar({ ...snackbar, open: false })} severity={snackbar.severity} sx={{ width: '100%' }}>
-          {snackbar.message}
-        </Alert>
-      </Snackbar>
 
     </Paper>
   );

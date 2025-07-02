@@ -44,7 +44,7 @@ const Register = () => {
       origine: '',
       situation_matrimoniale: '',
       niveau_education: '',
-      qualification: 'En integration' // Exactement comme dans le modèle
+      qualification: 'En intégration' // Exactement comme dans le modèle
     },
     validationSchema: Yup.object({
       username: Yup.string()
@@ -78,7 +78,7 @@ const Register = () => {
         .required('Niveau d\'éducation requis'),
       qualification: Yup.string()
         .required('Qualification requise')
-        .oneOf(['12', '144', '1728', 'Leader', 'Responsable reseau', 'Regulier', 'Irregulier', 'En integration'], 'Qualification invalide')
+        .oneOf(['12', '144', '1728', 'Leader', 'Responsable réseau', 'Régulier', 'Irrégulier', 'En intégration'], 'Qualification invalide')
     }),
     onSubmit: async (values) => {
       try {

@@ -1,33 +1,25 @@
-
 import { Box, Typography, Grid, Card } from '@mui/material';
 import PeopleIcon from '@mui/icons-material/People';
 import NetworkIcon from '@mui/icons-material/NetworkCheck';
 import { useState, useEffect } from 'react';
-import axios from 'axios';
+import { apiService } from '../../../services/apiService';
 
 const Overview = () => {
-
     const [stats, setStats] = useState({});
-
-    const API_URL = process.env.REACT_APP_API_URL + '/api';
 
     useEffect(() => {
         const fetchStats = async () => {
-          try {
-            const token = localStorage.getItem('token');
-            const res = await axios.get(`${API_URL}/stats`, {
-              headers: { Authorization: `Bearer ${token}` }
-            });
-            setStats(res.data);
-          } catch (err) {
-            console.error('Erreur lors de la récupération des stats', err);
-          }
+            try {
+                const res = await apiService.stats.getOverview();
+                setStats(res.data?.data || res.data || {});
+            } catch (err) {
+                console.error('Erreur lors de la récupération des stats', err);
+            }
         };
         fetchStats();
-      }, []);
+    }, []);
 
     return (
-
         <Box>
             <Typography variant="h4" gutterBottom>Vue d'ensemble</Typography>
             <Grid container spacing={3}>

@@ -12,7 +12,7 @@ import {
   CircularProgress,
   Alert
 } from '@mui/material';
-import axios from 'axios';
+import { apiService } from '../../../services/apiService';
 
 const UsersRetired = () => {
   const [retired, setRetired] = useState([]);
@@ -24,11 +24,8 @@ const UsersRetired = () => {
       setLoading(true);
       setError(null);
       try {
-        const token = localStorage.getItem('token');
-        const res = await axios.get(`${process.env.REACT_APP_API_URL}/api/users/retired`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        setRetired(res.data.data);
+        const res = await apiService.users.getRetired();
+        setRetired(res.data?.data || res.data || []);
       } catch (err) {
         setError(err.response?.data?.message || err.message);
       } finally {

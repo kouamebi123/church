@@ -6,17 +6,15 @@ import AddIcon from '@mui/icons-material/Add';
 import SearchIcon from '@mui/icons-material/Search';
 import { useState, useEffect } from 'react';
 import ErrorMessage from '../../ErrorMessage';
-
-const API_URL = process.env.REACT_APP_API_URL + '/api';
+import { useNotification } from '../../../hooks/useNotification';
+import { apiService } from '../../../services/apiService';
 
 const Departments = () => {
-
     const [departments, setDepartments] = useState([]);
-    const [departmentsError, setDepartmentsError] = useState(null);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState(null);
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [departmentToDelete, setDepartmentToDelete] = useState(null);
-    const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
-    const [loadingDepartments, setLoadingDepartments] = useState(false);
     const [departmentModal, setDepartmentModal] = useState(false);
     const [editingDepartmentId, setEditingDepartmentId] = useState(null);
     const [departmentForm, setDepartmentForm] = useState({
@@ -24,6 +22,31 @@ const Departments = () => {
     });
     const [departmentSearchTerm, setDepartmentSearchTerm] = useState('');
 
+    const {
+        notification,
+        showSuccess,
+        showError,
+        hideNotification
+    } = useNotification();
+
+    const loadDepartments = async () => {
+        setLoading(true);
+        try {
+            const response = await apiService.departments.getAll();
+            setDepartments(response.data?.data || response.data || []);
+            setError(null);
+        } catch (err) {
+            setError('Erreur lors du chargement des départements');
+            setDepartments([]);
+            console.error(err);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        loadDepartments();
+    }, []);
 
     const handleEditDepartment = (department) => {
         setDepartmentForm({ nom: department.nom });
@@ -31,104 +54,46 @@ const Departments = () => {
         setDepartmentModal(true);
     };
 
-    // Ouvre le dialog de confirmation
     const handleOpenDeleteDialog = (department) => {
         setDepartmentToDelete(department);
         setDeleteDialogOpen(true);
     };
 
-    // Ferme le dialog
     const handleCloseDeleteDialog = () => {
         setDeleteDialogOpen(false);
         setDepartmentToDelete(null);
     };
 
-    // Confirme la suppression
     const handleConfirmDeleteDepartment = async () => {
         if (!departmentToDelete) return;
         try {
-            const token = localStorage.getItem('token');
-            const response = await fetch(`${API_URL}/departments/${departmentToDelete._id}`, {
-                method: 'DELETE',
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
-            });
-            if (response.ok) {
-                await loadDepartments();
-                setSnackbar({ open: true, message: 'Département supprimé avec succès', severity: 'success' });
-            } else {
-                const error = await response.json();
-                setSnackbar({ open: true, message: error.message || 'Erreur lors de la suppression', severity: 'error' });
-            }
+            await apiService.departments.delete(departmentToDelete._id);
+            showSuccess('Département supprimé avec succès');
+            await loadDepartments();
         } catch (err) {
-            setSnackbar({ open: true, message: 'Erreur lors de la suppression', severity: 'error' });
+            showError(err.message || 'Erreur lors de la suppression');
         } finally {
             handleCloseDeleteDialog();
         }
     };
 
-    // Fonction pour charger les départements
-    const loadDepartments = async () => {
-        setLoadingDepartments(true);
-        try {
-            const token = localStorage.getItem('token');
-            const response = await fetch(`${API_URL}/departments`, {
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
-            });
-            const result = await response.json();
-            if (response.ok && result.success) {
-                setDepartments(result.data);
-                setDepartmentsError(null); // Réinitialiser l'erreur si le chargement réussit
-            } else {
-                throw new Error(result.message || 'Erreur lors du chargement des départements');
-            }
-        } catch (err) {
-            setDepartmentsError('Erreur lors du chargement des départements');
-            setDepartments([]); // Réinitialiser les départements en cas d'erreur
-            console.error(err);
-        } finally {
-            setLoadingDepartments(false); // S'assurer que le loading est désactivé
-        }
-    };
-
-
-
-    useEffect(() => {
-        loadDepartments();
-    }, []);
-
     const handleDepartmentSubmit = async (e) => {
         e.preventDefault();
         try {
-            const token = localStorage.getItem('token');
-            const url = editingDepartmentId
-                ? `${API_URL}/departments/${editingDepartmentId}`
-                : `${API_URL}/departments`;
-
-            const response = await fetch(url, {
-                method: editingDepartmentId ? 'PUT' : 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify(departmentForm)
-            });
-
-            if (response.ok) {
-                setDepartmentModal(false);
-                setDepartmentForm({ nom: '' });
-                setEditingDepartmentId(null);
-                setSnackbar({ open: true, message: 'Département créé avec succès', severity: 'success' });
-                await loadDepartments();
+            if (editingDepartmentId) {
+                await apiService.departments.update(editingDepartmentId, departmentForm);
+                showSuccess('Département modifié avec succès');
             } else {
-                const error = await response.json();
-                setSnackbar({ open: true, message: error.message || 'Erreur lors de la création du département', severity: 'error' });
-                console.error('Erreur lors de l\'opération:', error);
+                await apiService.departments.create(departmentForm);
+                showSuccess('Département créé avec succès');
             }
+            
+            setDepartmentModal(false);
+            setDepartmentForm({ nom: '' });
+            setEditingDepartmentId(null);
+            await loadDepartments();
         } catch (err) {
+            showError(err.message || 'Erreur lors de l\'opération');
             console.error('Erreur lors de l\'opération:', err);
         }
     };
@@ -150,12 +115,12 @@ const Departments = () => {
                 }}
                 sx={{ mb: 3 }}
             />
-            {loadingDepartments ? (
+            {loading ? (
                 <Box sx={{ display: 'flex', justifyContent: 'center', my: 3 }}>
                     <CircularProgress />
                 </Box>
-            ) : departmentsError ? (
-                <ErrorMessage error={departmentsError} />
+            ) : error ? (
+                <ErrorMessage error={error} />
             ) : (
                 <TableContainer data-aos="fade-up" component={Paper}>
                     <Table>
@@ -208,7 +173,11 @@ const Departments = () => {
             )}
             <Dialog
                 open={departmentModal}
-                onClose={() => setDepartmentModal(false)}
+                onClose={() => {
+                    setDepartmentModal(false);
+                    setEditingDepartmentId(null);
+                    setDepartmentForm({ nom: '' });
+                }}
                 maxWidth="sm"
                 fullWidth
                 PaperProps={{
@@ -234,12 +203,15 @@ const Departments = () => {
                         </Box>
                     </DialogContent>
                     <DialogActions>
-                        <Button onClick={() => setDepartmentModal(false)}>Annuler</Button>
+                        <Button onClick={() => {
+                            setDepartmentModal(false);
+                            setEditingDepartmentId(null);
+                            setDepartmentForm({ nom: '' });
+                        }}>Annuler</Button>
                         <Button type="submit" variant="contained" color="primary">{editingDepartmentId ? 'Modifier' : 'Créer'}</Button>
                     </DialogActions>
                 </form>
             </Dialog>
-            {/* Dialog de confirmation suppression */}
             <DeleteConfirmDialog
                 open={deleteDialogOpen}
                 title="Supprimer le département"
@@ -247,18 +219,6 @@ const Departments = () => {
                 onClose={handleCloseDeleteDialog}
                 onConfirm={handleConfirmDeleteDepartment}
             />
-
-            {/* Snackbar feedback */}
-            <Snackbar
-                open={snackbar.open}
-                autoHideDuration={4000}
-                onClose={() => setSnackbar({ ...snackbar, open: false })}
-                anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-            >
-                <Alert onClose={() => setSnackbar({ ...snackbar, open: false })} severity={snackbar.severity} sx={{ width: '100%' }}>
-                    {snackbar.message}
-                </Alert>
-            </Snackbar>
         </Box>
     );
 };

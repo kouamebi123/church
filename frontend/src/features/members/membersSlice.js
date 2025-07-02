@@ -1,35 +1,15 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
-import axios from 'axios';
-
-const API_URL = process.env.REACT_APP_API_URL + '/api';
-
-// Configure axios avec le token par défaut s'il existe
-const token = localStorage.getItem('token');
-if (token) {
-  axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-}
-
-// Fonction pour mettre à jour le token dans axios
-const updateAxiosToken = (token) => {
-  if (token) {
-    axios.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-  } else {
-    delete axios.defaults.headers.common['Authorization'];
-  }
-};
+import { apiService } from '../../services/apiService';
 
 // Async thunks
 export const getMembers = createAsyncThunk(
   'members/getMembers',
-  async (_, thunkAPI) => {
+  async (params, thunkAPI) => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get(`${API_URL}/users`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      return response.data;
+      const response = await apiService.users.getAll(params);
+      return response;
     } catch (error) {
-      return thunkAPI.rejectWithValue(error.response.data);
+      return thunkAPI.rejectWithValue(error);
     }
   }
 );
@@ -38,13 +18,10 @@ export const getMember = createAsyncThunk(
   'members/getMember',
   async (id, thunkAPI) => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.get(`${API_URL}/users/${id}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      return response.data;
+      const response = await apiService.users.getById(id);
+      return response;
     } catch (error) {
-      return thunkAPI.rejectWithValue(error.response.data);
+      return thunkAPI.rejectWithValue(error);
     }
   }
 );
@@ -53,13 +30,10 @@ export const createMember = createAsyncThunk(
   'members/createMember',
   async (memberData, thunkAPI) => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.post(`${API_URL}/users`, memberData, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      return response.data;
+      const response = await apiService.users.create(memberData);
+      return response;
     } catch (error) {
-      return thunkAPI.rejectWithValue(error.response.data);
+      return thunkAPI.rejectWithValue(error);
     }
   }
 );
@@ -68,13 +42,10 @@ export const updateMember = createAsyncThunk(
   'members/updateMember',
   async ({ id, memberData }, thunkAPI) => {
     try {
-      const token = localStorage.getItem('token');
-      const response = await axios.put(`${API_URL}/users/${id}`, memberData, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      return response.data;
+      const response = await apiService.users.update(id, memberData);
+      return response;
     } catch (error) {
-      return thunkAPI.rejectWithValue(error.response.data);
+      return thunkAPI.rejectWithValue(error);
     }
   }
 );
@@ -83,13 +54,34 @@ export const deleteMember = createAsyncThunk(
   'members/deleteMember',
   async (id, thunkAPI) => {
     try {
-      const token = localStorage.getItem('token');
-      await axios.delete(`${API_URL}/users/${id}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      await apiService.users.delete(id);
       return id;
     } catch (error) {
-      return thunkAPI.rejectWithValue(error.response.data);
+      return thunkAPI.rejectWithValue(error);
+    }
+  }
+);
+
+export const updateMemberQualification = createAsyncThunk(
+  'members/updateQualification',
+  async ({ id, qualification }, thunkAPI) => {
+    try {
+      const response = await apiService.users.updateQualification(id, qualification);
+      return response;
+    } catch (error) {
+      return thunkAPI.rejectWithValue(error);
+    }
+  }
+);
+
+export const resetMemberPassword = createAsyncThunk(
+  'members/resetPassword',
+  async (id, thunkAPI) => {
+    try {
+      const response = await apiService.users.resetPassword(id);
+      return response;
+    } catch (error) {
+      return thunkAPI.rejectWithValue(error);
     }
   }
 );
@@ -128,7 +120,7 @@ const membersSlice = createSlice({
       .addCase(getMembers.fulfilled, (state, action) => {
         state.isLoading = false;
         state.members = action.payload.data;
-        state.totalMembers = action.payload.total;
+        state.totalMembers = action.payload.count || action.payload.data.length;
       })
       .addCase(getMembers.rejected, (state, action) => {
         state.isLoading = false;
@@ -195,6 +187,19 @@ const membersSlice = createSlice({
       .addCase(deleteMember.rejected, (state, action) => {
         state.isLoading = false;
         state.error = action.payload?.message || 'Une erreur est survenue';
+      })
+      // Update Qualification
+      .addCase(updateMemberQualification.fulfilled, (state, action) => {
+        const index = state.members.findIndex(
+          (member) => member._id === action.payload.data._id
+        );
+        if (index !== -1) {
+          state.members[index] = action.payload.data;
+        }
+      })
+      // Reset Password
+      .addCase(resetMemberPassword.fulfilled, (state) => {
+        // Pas de changement d'état nécessaire pour le reset de mot de passe
       });
   }
 });

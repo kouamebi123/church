@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Typography, Box, Grid, Paper, CircularProgress } from '@mui/material';
 import { ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend } from 'recharts';
 import { transformStackedBarData, computeGrowthData } from './StatsReseauxHelpers';
+import { apiService } from '../../../services/apiService';
 
 const COLORS = [
   '#e6194b', '#3cb44b', '#ffe119', '#4363d8', '#f58231',
@@ -11,8 +12,6 @@ const COLORS = [
   '#ffffff', '#000000', '#a28ef5', '#ffb6b9', '#00c49f',
   '#0088fe', '#ffc658', '#ff8042', '#7b68ee', '#f0e130'
 ];
-
-const API_URL = process.env.REACT_APP_API_URL + '/api';
 
 const StatsReseaux = () => {
   const [networkStats, setNetworkStats] = useState([]); // PieChart
@@ -25,53 +24,62 @@ const StatsReseaux = () => {
   const currentYear = new Date().getFullYear();
   const lastYear = currentYear - 1;
 
-  useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true);
-      setError(null);
+  const fetchData = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      console.log('StatsReseaux: Début du chargement des données');
+      
+      // 1. Effectif par réseau
+      console.log('StatsReseaux: Chargement des stats réseaux...');
+      const resNetwork = await apiService.stats.getNetworks();
+      const dataNetwork = resNetwork.data?.data || resNetwork.data || [];
+      setNetworkStats(
+        dataNetwork.map(n => ({ name: n.nom, value: n.memberCount || 0 }))
+      );
+      console.log('StatsReseaux: Stats réseaux chargées', dataNetwork);
+      
+      // 2. Evolution membres réseaux
+      console.log('StatsReseaux: Chargement de l\'évolution...');
+      const resEvolution = await apiService.stats.getNetworksEvolution();
+      const dataEvolution = resEvolution.data?.data || resEvolution.data || [];
+      setNetworkEvolution(Array.isArray(dataEvolution) ? dataEvolution : []);
+      console.log('StatsReseaux: Évolution chargée', dataEvolution);
+      
+      // 3. Comparaison annuelle réseaux
+      console.log('StatsReseaux: Chargement de la comparaison annuelle...');
+      const resCompare = await apiService.stats.getNetworksComparison(`${lastYear},${currentYear}`);
+      const dataCompare = resCompare.data?.data || resCompare.data || [];
+      setNetworkYearCompare(Array.isArray(dataCompare) ? dataCompare : []);
+      console.log('StatsReseaux: Comparaison annuelle chargée', dataCompare);
+      
+      // 4. Graphe supplémentaire : Répartition par genre dans chaque réseau (si dispo)
+      // 4a. Composition membres par catégorie (pour stacked bar)
       try {
-        const token = localStorage.getItem('token');
-        // 1. Effectif par réseau
-        const resNetwork = await fetch(`${API_URL}/networks/stats`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        const dataNetwork = await resNetwork.json();
-        if (resNetwork.ok && dataNetwork.success) {
-          setNetworkStats(
-            dataNetwork.data.map(n => ({ name: n.nom, value: n.memberCount || 0 }))
-          );
-        }
-        // 2. Evolution membres réseaux
-        const resEvolution = await fetch(`${API_URL}/stats/networks/evolution`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        const dataEvolution = await resEvolution.json();
-        if (resEvolution.ok && dataEvolution.success) {
-          setNetworkEvolution(dataEvolution.data);
-        }
-        // 3. Comparaison annuelle réseaux
-        const resCompare = await fetch(`${API_URL}/stats/networks/evolution/compare?years=${lastYear},${currentYear}`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        const dataCompare = await resCompare.json();
-        if (resCompare.ok && dataCompare.success) {
-          setNetworkYearCompare(dataCompare.data);
-        }
-        // 4. Graphe supplémentaire : Répartition par genre dans chaque réseau (si dispo)
-        // 4a. Composition membres par catégorie (pour stacked bar)
-        const resCategories = await fetch(`${API_URL}/networks/qualification-stats`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        const dataCategories = await resCategories.json();
-        if (resCategories.ok && dataCategories.success) {
-          setStackedData(dataCategories.data);
-        }
+        console.log('StatsReseaux: Chargement des stats qualification...');
+        const resCategories = await apiService.networks.getQualificationStats();
+        const dataCategories = resCategories.data?.data || resCategories.data || [];
+        setStackedData(Array.isArray(dataCategories) ? dataCategories : []);
+        console.log('StatsReseaux: Stats qualification chargées', dataCategories);
       } catch (err) {
-        setError('Erreur lors du chargement des statistiques réseaux');
-      } finally {
-        setLoading(false);
+        console.log('StatsReseaux: Erreur stats qualification (non critique)', err);
+        setStackedData([]);
       }
-    };
+      
+      console.log('StatsReseaux: Toutes les données chargées avec succès');
+    } catch (err) {
+      console.error('StatsReseaux: Erreur lors du chargement', err);
+      setError('Erreur lors du chargement des statistiques réseaux');
+      setNetworkStats([]);
+      setNetworkEvolution([]);
+      setNetworkYearCompare([]);
+      setStackedData([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     fetchData();
   }, []);
 
@@ -132,20 +140,20 @@ const StatsReseaux = () => {
                     <Typography sx={{ fontSize: 18, color: '#444', fontStyle: 'italic', textAlign: 'center' }}>
                       {"À la date du "}
                       <Box component="span" fontWeight="bold" color="primary.main">{`${jour} ${mois} ${annee}`}</Box>
-                      {", l’effectif total des membres des différents réseaux est de "}
+                      {", l'effectif total des membres des différents réseaux est de "}
                       <Box component="span" fontWeight="bold" color="primary.main">{total}</Box>
                       <Box component="span" fontWeight="bold" color="primary.main">{" personnes."}</Box>
                       {plusGrand && (
                         <>
                           {" Le plus grand réseau est "}
-                          <Box component="span" fontWeight="bold" color="primary.main">{` « ${plusGrand.name} »`}</Box>
+                          <Box component="span" fontWeight="bold" color="primary.main">{` « ${plusGrand.name} »`}</Box>
                           {" avec "}
                           <Box component="span" fontWeight="bold" color="primary.main">{plusGrand.value}</Box>
                           <Box component="span" fontWeight="bold" color="primary.main">{" membres"}</Box>
                           {second && (
                             <>
                               {", suivi du réseau "}
-                              <Box component="span" fontWeight="bold" color="primary.main">{` « ${second.name} »`}</Box>
+                              <Box component="span" fontWeight="bold" color="primary.main">{` « ${second.name} »`}</Box>
                               {" ("}
                               <Box component="span" fontWeight="bold" color="primary.main">{second.value}</Box>
                               <Box component="span" fontWeight="bold" color="primary.main">{" membres"}</Box>
@@ -163,7 +171,7 @@ const StatsReseaux = () => {
                               {"En "}
                               <Box component="span" fontWeight="bold" color="primary.main">{`${mois} ${annee}`}</Box>
                               {", le réseau "}
-                              <Box component="span" fontWeight="bold" color="primary.main">{` « ${reseauxNouveaux[0].name} »`}</Box>
+                              <Box component="span" fontWeight="bold" color="primary.main">{` « ${reseauxNouveaux[0].name} »`}</Box>
                               {" a vu le jour."}
                             </>
                           ) : (
@@ -171,7 +179,7 @@ const StatsReseaux = () => {
                               {"En "}
                               <Box component="span" fontWeight="bold" color="primary.main">{`${mois} ${annee}`}</Box>
                               {", les réseaux "}
-                              <Box component="span" fontWeight="bold" color="primary.main">{reseauxNouveaux.map(r => `« ${r.name} »`).join(', ')}</Box>
+                              <Box component="span" fontWeight="bold" color="primary.main">{reseauxNouveaux.map(r => `« ${r.name} »`).join(', ')}</Box>
                               {" ont vu le jour."}
                             </>
                           )}
@@ -203,11 +211,11 @@ const StatsReseaux = () => {
               </Box>
             </Paper>
           </Grid>
-          {/* BarChart - Comparaison de l’évolution des réseaux (3 derniers mois) */}
+          {/* BarChart - Comparaison de l'évolution des réseaux (3 derniers mois) */}
           <Grid data-aos="fade-up" item xs={12} sx={{ mt: 4 }}>
             <Paper sx={{ p: 3, minHeight: 320, backgroundColor: '#f9f9f9', overflowX: 'auto' }}>
               <Typography variant="h6" gutterBottom sx={{ fontSize: 22 }}>
-                Comparaison de l’évolution des réseaux (3 derniers mois)
+                Comparaison de l'évolution des réseaux (3 derniers mois)
               </Typography>
               <ResponsiveContainer width="100%" height={400}>
                 <BarChart data={(() => {
@@ -313,28 +321,28 @@ const StatsReseaux = () => {
                         {growing.length > 0 && (
                           <>
                             <Box component="span" fontWeight="bold" color="success.main">
-                              Réseaux en croissance : {growing.map(n => `« ${n.name} » (+${n.croissance}%)`).join(', ')}
+                              Réseaux en croissance : {growing.map(n => `« ${n.name} » (+${n.croissance}%)`).join(', ')}
                             </Box>.<br />
                           </>
                         )}
                         {declining.length > 0 && (
                           <>
                             <Box component="span" fontWeight="bold" color="error.main">
-                              Réseaux en baisse : {declining.map(n => `« ${n.name} » (${n.croissance}%)`).join(', ')}
+                              Réseaux en baisse : {declining.map(n => `« ${n.name} » (${n.croissance}%)`).join(', ')}
                             </Box>.<br />
                           </>
                         )}
                         {stagnant.length > 0 && (
                           <>
                             <Box component="span" fontWeight="bold" color="warning.main">
-                              Réseaux stables : {stagnant.map(n => `« ${n.name} »`).join(', ')}
+                              Réseaux stables : {stagnant.map(n => `« ${n.name} »`).join(', ')}
                             </Box>.<br />
                           </>
                         )}
                         {newOnes.length > 0 && (
                           <>
                             <Box component="span" fontWeight="bold" color="info.main">
-                              Nouveaux réseaux : {newOnes.map(n => `« ${n.name} »`).join(', ')}
+                              Nouveaux réseaux : {newOnes.map(n => `« ${n.name} »`).join(', ')}
                             </Box>.<br />
                           </>
                         )}

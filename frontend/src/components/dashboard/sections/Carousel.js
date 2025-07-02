@@ -1,122 +1,40 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Typography, Button, IconButton, CircularProgress, Dialog, DialogTitle, DialogContent, DialogActions, TableCell, TableContainer, Table, TableHead, TableRow, Paper, TableBody, Snackbar, Alert } from '@mui/material';
-import AddIcon from '@mui/icons-material/Add';
-
-import DeleteIcon from '@mui/icons-material/Delete';
-import DeleteConfirmDialog from '../../DeleteConfirmDialog';
+import { Add as AddIcon, Delete as DeleteIcon } from '@mui/icons-material';
+import Loading from '../../Loading';
 import ErrorMessage from '../../ErrorMessage';
+import DeleteConfirmDialog from '../../DeleteConfirmDialog';
+import { useNotification } from '../../../hooks/useNotification';
+import { apiService } from '../../../services/apiService';
 
-
-const API_URL = process.env.REACT_APP_API_URL + '/api';
-
-
-const API_URL_IMAGE = process.env.REACT_APP_API_URL;
 const Carousel = () => {
     const [carouselModal, setCarouselModal] = useState(false);
     const [carouselImages, setCarouselImages] = useState([]);
-    const [loadingCarousel, setLoadingCarousel] = useState(false);
-    const [carouselError, setCarouselError] = useState(null);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState(null);
     const [selectedFile, setSelectedFile] = useState(null);
     const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
     const [imageToDelete, setImageToDelete] = useState(null);
-    const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'info' });
 
+    const {
+        notification,
+        showSuccess,
+        showError,
+        hideNotification
+    } = useNotification();
 
-    // Fonction pour charger les images du carousel
     const loadCarouselImages = async () => {
-        setLoadingCarousel(true);
+        setLoading(true);
         try {
-            const token = localStorage.getItem('token');
-            const response = await fetch(`${API_URL}/carousel`, {
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
-            });
-            const result = await response.json();
-            if (response.ok && result.success) {
-                setCarouselImages(result.data);
-                setCarouselError(null);
-            } else {
-                throw new Error(result.message || 'Erreur lors du chargement des images');
-            }
+            const response = await apiService.carousel.getAll();
+            setCarouselImages(response.data?.data || response.data || []);
+            setError(null);
         } catch (err) {
-            setCarouselError('Erreur lors du chargement des images du carousel');
+            setError('Erreur lors du chargement des images du carousel');
             setCarouselImages([]);
             console.error(err);
         } finally {
-            setLoadingCarousel(false);
-        }
-    };
-
-    // Ouvre le dialog de confirmation et stocke l'image à supprimer
-    const handleOpenDeleteDialog = (img) => {
-        setImageToDelete(img);
-        setDeleteDialogOpen(true);
-    };
-
-    // Ferme le dialog et réinitialise
-    const handleCloseDeleteDialog = () => {
-        setDeleteDialogOpen(false);
-        setImageToDelete(null);
-    };
-
-    // Confirme la suppression
-    const handleConfirmDeleteImage = async () => {
-        if (!imageToDelete) return;
-        try {
-            const token = localStorage.getItem('token');
-            const response = await fetch(`${API_URL}/carousel/${imageToDelete._id}`, {
-                method: 'DELETE',
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                }
-            });
-            if (response.ok) {
-                await loadCarouselImages();
-                setSnackbar({ open: true, message: 'Image supprimée avec succès', severity: 'success' });
-            } else {
-                const error = await response.json();
-                setSnackbar({ open: true, message: error.message || 'Erreur lors de la suppression', severity: 'error' });
-            }
-        } catch (err) {
-            setSnackbar({ open: true, message: 'Erreur lors de la suppression', severity: 'error' });
-        } finally {
-            handleCloseDeleteDialog();
-        }
-    };
-
-
-    const handleCarouselSubmit = async (e) => {
-        e.preventDefault();
-        if (!selectedFile) {
-            alert('Veuillez sélectionner une image');
-            return;
-        }
-        try {
-            const token = localStorage.getItem('token');
-            const formData = new FormData();
-            formData.append('image', selectedFile);
-
-            const response = await fetch(`${API_URL}/carousel`, {
-                method: 'POST',
-                headers: {
-                    'Authorization': `Bearer ${token}`
-                },
-                body: formData
-            });
-
-            const result = await response.json();
-            if (response.ok && result.success) {
-                setCarouselModal(false);
-                setSelectedFile(null);
-                setSnackbar({ open: true, message: 'Image ajoutée avec succès', severity: 'success' });
-                await loadCarouselImages();
-            } else {
-                setSnackbar({ open: true, message: result.message || 'Erreur lors de l\'ajout de l\'image', severity: 'error' });
-            }
-        } catch (err) {
-            console.error('Erreur lors de la création de l\'élément du carousel:', err);
-            setSnackbar({ open: true, message: 'Erreur lors de l\'ajout de l\'image', severity: 'error' });
+            setLoading(false);
         }
     };
 
@@ -124,18 +42,69 @@ const Carousel = () => {
         loadCarouselImages();
     }, []);
 
+    const handleFileSelect = (event) => {
+        const file = event.target.files[0];
+        if (file) {
+            setSelectedFile(file);
+        }
+    };
+
+    const handleUpload = async (event) => {
+        if (event) event.preventDefault();
+        if (!selectedFile) return;
+
+        try {
+            const formData = new FormData();
+            formData.append('image', selectedFile);
+            console.log('image', selectedFile);
+
+            await apiService.carousel.upload(formData);
+            showSuccess('Image ajoutée au carousel avec succès');
+            setCarouselModal(false);
+            setSelectedFile(null);
+            await loadCarouselImages();
+        } catch (err) {
+            showError(err.message || 'Erreur lors de l\'upload de l\'image');
+        }
+    };
+
+    const handleDeleteImage = async () => {
+        if (!imageToDelete) return;
+
+        try {
+            await apiService.carousel.delete(imageToDelete._id);
+            showSuccess('Image supprimée avec succès');
+            await loadCarouselImages();
+        } catch (err) {
+            showError(err.message || 'Erreur lors de la suppression');
+        } finally {
+            setDeleteDialogOpen(false);
+            setImageToDelete(null);
+        }
+    };
+
+    const handleOpenDeleteDialog = (image) => {
+        setImageToDelete(image);
+        setDeleteDialogOpen(true);
+    };
+
+    const handleCloseDeleteDialog = () => {
+        setDeleteDialogOpen(false);
+        setImageToDelete(null);
+    };
+
     return (
         <Box>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
                 <Typography variant="h4" sx={{ mb: 2, fontWeight: 'bold', color: 'primary.main' }}>Gestion du carousel</Typography>
                 <Button variant="contained" startIcon={<AddIcon />} onClick={() => setCarouselModal(true)}>Nouvelle image</Button>
             </Box>
-            {loadingCarousel ? (
+            {loading ? (
                 <Box sx={{ display: 'flex', justifyContent: 'center', my: 3 }}>
                     <CircularProgress />
                 </Box>
-            ) : carouselError ? (
-                <ErrorMessage error={carouselError} />
+            ) : error ? (
+                <ErrorMessage error={error} />
             ) : (
                 <TableContainer data-aos="fade-up" component={Paper}>
                     <Table>
@@ -151,7 +120,7 @@ const Carousel = () => {
                                 <TableRow key={image._id}>
                                     <TableCell>
                                         <img
-                                            src={`${API_URL_IMAGE}${image.chemin_image}`}
+                                            src={`${process.env.REACT_APP_API_URL}${image.chemin_image}`}
                                             alt="Carousel"
                                             style={{ height: '50px', width: 'auto' }}
                                         />
@@ -193,7 +162,7 @@ const Carousel = () => {
                 }}
             >
                 <DialogTitle>Nouvel élément du carousel</DialogTitle>
-                <form onSubmit={handleCarouselSubmit}>
+                <form onSubmit={handleUpload}>
                     <DialogContent sx={{ display: 'flex', justifyContent: 'center' }}>
                         <Box sx={{ width: '100%', maxWidth: '450px' }}>
                             <Button
@@ -208,7 +177,7 @@ const Carousel = () => {
                                     hidden
                                     accept="image/*"
                                     required
-                                    onChange={(e) => setSelectedFile(e.target.files[0])}
+                                    onChange={handleFileSelect}
                                 />
                             </Button>
                             {selectedFile && (
@@ -239,18 +208,18 @@ const Carousel = () => {
                 title="Supprimer l'image du carousel"
                 content={imageToDelete ? `Êtes-vous sûr de vouloir supprimer l'image ${imageToDelete.chemin_image} ?` : "Êtes-vous sûr de vouloir supprimer cette image ?"}
                 onClose={handleCloseDeleteDialog}
-                onConfirm={handleConfirmDeleteImage}
+                onConfirm={handleDeleteImage}
             />
 
             {/* Snackbar feedback */}
             <Snackbar
-                open={snackbar.open}
+                open={notification.open}
                 autoHideDuration={4000}
-                onClose={() => setSnackbar({ ...snackbar, open: false })}
+                onClose={hideNotification}
                 anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
             >
-                <Alert onClose={() => setSnackbar({ ...snackbar, open: false })} severity={snackbar.severity} sx={{ width: '100%' }}>
-                    {snackbar.message}
+                <Alert onClose={hideNotification} severity={notification.severity} sx={{ width: '100%' }}>
+                    {notification.message}
                 </Alert>
             </Snackbar>
         </Box>

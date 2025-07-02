@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Typography, Box, Paper, CircularProgress } from '@mui/material';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend } from 'recharts';
+import { apiService } from '../../../services/apiService';
 
-const API_URL = process.env.REACT_APP_API_URL + '/api';
 const COLORS = ["#8884d8", "#82ca9d", "#ffc658"];
 
 const StatsCultes = () => {
@@ -10,35 +10,31 @@ const StatsCultes = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  useEffect(() => {
-    const fetchAttendance = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const token = localStorage.getItem('token');
-        // Récupère les 3 derniers mois
-        const now = new Date();
-        const startMonth = new Date(now.getFullYear(), now.getMonth() - 2, 1);
-        const endMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-        const start = startMonth.toISOString().slice(0, 10);
-        const end = endMonth.toISOString().slice(0, 10);
-        const res = await fetch(`${API_URL}/services/period?start=${start}&end=${end}`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        const data = await res.json();
-        if (res.ok && data.success) {
-          setServiceAttendance(data.data);
-        } else {
-          throw new Error(data.message || 'Erreur lors du chargement des fréquentations cultes');
-        }
-      } catch (err) {
-        setError('Erreur lors du chargement des fréquentations cultes');
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchAttendance();
+  const fetchAttendance = useMemo(() => async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      // Récupère les 3 derniers mois
+      const now = new Date();
+      const startMonth = new Date(now.getFullYear(), now.getMonth() - 2, 1);
+      const endMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+      const start = startMonth.toISOString().slice(0, 10);
+      const end = endMonth.toISOString().slice(0, 10);
+      
+      const res = await apiService.services.getAll({ start, end });
+      const data = res.data?.data || res.data || [];
+      setServiceAttendance(Array.isArray(data) ? data : []);
+    } catch (err) {
+      setError('Erreur lors du chargement des fréquentations cultes');
+      setServiceAttendance([]);
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchAttendance();
+  }, [fetchAttendance]);
 
   // Préparation des données pour LineChart (8 derniers dimanches)
   const chartData = React.useMemo(() => {

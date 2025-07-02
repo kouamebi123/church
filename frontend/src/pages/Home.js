@@ -6,15 +6,17 @@ import {
   Typography,
   Paper,
   Box,
+  MenuItem,
+  Select,
+  InputLabel,
+  FormControl,
 } from '@mui/material';
 import { styled } from '@mui/material/styles';
 import { useSelector } from 'react-redux';
 import Carousel from '../components/Carousel';
 import { AccountTree, SupervisorAccount, GroupWork, EmojiPeople, SentimentDissatisfied, AdminPanelSettings, People, ChildCare, PersonOff, Star, Diversity3, PersonAddAlt1, CoPresent } from '@mui/icons-material';
-import axios from 'axios';
 import Loading from '../components/Loading';
-
-const API_URL = process.env.REACT_APP_API_URL + '/api';
+import { apiService } from '../services/apiService';
 
 const StatCard = styled(Paper)(({ theme, isTotal }) => ({
   padding: theme.spacing(3),
@@ -63,21 +65,41 @@ const StyledTypography = styled(Typography)(({ theme }) => ({
 const Home = () => {
   const { user } = useSelector((state) => state.auth);
   const [stats, setStats] = useState(null);
+  const [churches, setChurches] = useState([]);
+  const [selectedChurch, setSelectedChurch] = useState('');
+
+  useEffect(() => {
+    const fetchChurches = async () => {
+      try {
+        const res = await apiService.churches.getAll();
+        setChurches(res.data?.data || res.data || []);
+      } catch (err) {
+        setChurches([]);
+      }
+    };
+    if (user?.role === 'admin' || user?.role === 'super-admin') {
+      fetchChurches();
+    }
+  }, [user]);
 
   useEffect(() => {
     const fetchStats = async () => {
       try {
-        const token = localStorage.getItem('token');
-        const res = await axios.get(`${API_URL}/stats`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        setStats(res.data);
+        let res;
+        if (user?.role === 'admin' || user?.role === 'super-admin') {
+          res = await apiService.stats.getOverview(selectedChurch ? { churchId: selectedChurch } : {});
+        } else if (user?.eglise_locale) {
+          res = await apiService.stats.getOverview({ churchId: user.eglise_locale });
+        } else {
+          res = await apiService.stats.getOverview();
+        }
+        setStats(res.data?.data || res.data || {});
       } catch (err) {
         console.error('Erreur lors de la récupération des stats', err);
       }
     };
     fetchStats();
-  }, []);
+  }, [user, selectedChurch]);
 
   if (!stats) return <Loading titre="Chargement des statistiques" />;
 
@@ -106,6 +128,25 @@ const Home = () => {
         <Typography variant="h3" sx={{ mb: 4, textAlign: 'center', fontWeight: 'bold', color: 'primary.main' }}>
           Statistiques Générales
         </Typography>
+
+        {(user?.role === 'admin' || user?.role === 'super-admin') && (
+          <Box sx={{ mb: 3, display: 'flex', justifyContent: 'center' }}>
+            <FormControl sx={{ minWidth: 250 }}>
+              <InputLabel id="church-select-label">Filtrer par église</InputLabel>
+              <Select
+                labelId="church-select-label"
+                value={selectedChurch}
+                label="Filtrer par église"
+                onChange={(e) => setSelectedChurch(e.target.value)}
+              >
+                <MenuItem value=""><em>Toutes les églises</em></MenuItem>
+                {churches.map((church) => (
+                  <MenuItem key={church._id} value={church._id}>{church.nom}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          </Box>
+        )}
 
         <Grid container width="92%" mx="auto">
           {statsConfig.map((stat, index) => (

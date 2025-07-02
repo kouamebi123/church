@@ -7,9 +7,11 @@ const User = require('../models/User');
 // @access  Private
 exports.getNetworks = async (req, res) => {
     try {
-        const networks = await Network.find()
+        const filter = req.query.churchId ? { church: req.query.churchId } : {};
+        const networks = await Network.find(filter)
             .populate('responsable1', 'username')
             .populate('responsable2', 'username')
+            .populate('church', 'nom adresse')
             .populate({
                 path: 'groups',
                 populate: {
@@ -39,6 +41,7 @@ exports.getNetwork = async (req, res) => {
         const network = await Network.findById(req.params.id)
             .populate('responsable1', 'username')
             .populate('responsable2', 'username')
+            .populate('church', 'nom adresse')
             .populate({
                 path: 'groups',
                 populate: {
@@ -74,7 +77,13 @@ exports.getNetwork = async (req, res) => {
 // @access  Private/Admin
 exports.createNetwork = async (req, res) => {
     try {
-        const network = await Network.create(req.body);
+        const network = await Network.create({
+            nom: req.body.nom,
+            responsable1: req.body.responsable1,
+            responsable2: req.body.responsable2,
+            active: req.body.active,
+            church: req.body.church || null
+        });
 
         // Mettre à jour la qualification des responsables
         const responsables = [];
@@ -113,9 +122,16 @@ exports.updateNetwork = async (req, res) => {
         }
 
         // 2. Appliquer la mise à jour
+        const updateFields = {
+            nom: req.body.nom,
+            responsable1: req.body.responsable1,
+            responsable2: req.body.responsable2,
+            active: req.body.active,
+            church: req.body.church
+        };
         const network = await Network.findByIdAndUpdate(
             req.params.id,
-            req.body,
+            updateFields,
             {
                 new: true,
                 runValidators: true
@@ -336,7 +352,6 @@ exports.getNetworkStats = async (req, res) => {
         );
 
         res.status(200).json({
-            success: true,
             data: stats
         });
     } catch (error) {

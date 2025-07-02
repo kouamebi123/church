@@ -7,29 +7,76 @@ const Network = require('../models/Network');
 // @access  Private
 exports.getGlobalStats = async (req, res) => {
   try {
-    const total_reseaux = await Network.countDocuments();
-    const total_resp_reseaux = await User.countDocuments({ qualification: 'Responsable réseau' });
-    const total_gr = await Group.countDocuments();
-    const allGroups = await Group.find({}, ['responsable1', 'responsable2']);
+    const churchFilter = req.query.churchId ? { eglise_locale: req.query.churchId } : {};
+    
+    // Statistiques des réseaux
+    const total_reseaux = req.query.churchId
+      ? await Network.countDocuments({ church: req.query.churchId })
+      : await Network.countDocuments();
+    
+    const total_resp_reseaux = await User.countDocuments({ qualification: 'Responsable réseau', ...churchFilter });
+    
+    // Statistiques des groupes et responsables de GR
+    let total_gr = 0;
     let total_resp_gr = 0;
+    
+    if (req.query.churchId) {
+      // Si on filtre par église, on doit d'abord récupérer les réseaux de cette église
+      const networksInChurch = await Network.find({ church: req.query.churchId }).select('_id');
+      const networkIds = networksInChurch.map(n => n._id);
+      
+      // Compter les groupes dans ces réseaux
+      total_gr = await Group.countDocuments({ network: { $in: networkIds } });
+      
+      // Compter les responsables de GR dans ces réseaux
+      const groupsInChurch = await Group.find({ network: { $in: networkIds } }).select('responsable1 responsable2');
+      const responsableIds = new Set();
+      groupsInChurch.forEach(gr => {
+        if (gr.responsable1) responsableIds.add(gr.responsable1.toString());
+        if (gr.responsable2) responsableIds.add(gr.responsable2.toString());
+      });
+      total_resp_gr = responsableIds.size;
+    } else {
+      // Toutes les églises
+      total_gr = await Group.countDocuments();
+      const allGroups = await Group.find({}, ['responsable1', 'responsable2']);
+      const responsableIds = new Set();
     allGroups.forEach(gr => {
-      if (gr.responsable1) total_resp_gr += 1;
-      if (gr.responsable2) total_resp_gr += 1;
-    });
-    const total_leaders = await User.countDocuments({ qualification: 'Leader' });
-    const total_leaders_all = await User.countDocuments({ qualification: { $in: ['Leader', 'Responsable réseau', '12', '144', '1728'] } });
-    const total_reguliers = await User.countDocuments({ qualification: 'Régulier' });
-    const total_integration = await User.countDocuments({ qualification: 'En intégration' });
-    const total_irreguliers = await User.countDocuments({ qualification: 'Irrégulier' });
-    const total_gouvernance = await User.countDocuments({ qualification: 'Gouvernance' });
-    const total_ecodim = await User.countDocuments({ qualification: 'Ecodim' });
-    const total_resp_ecodim = await User.countDocuments({ qualification: 'Responsable ecodim' });
-    const usersInGroups = await Group.distinct('members');
+        if (gr.responsable1) responsableIds.add(gr.responsable1.toString());
+        if (gr.responsable2) responsableIds.add(gr.responsable2.toString());
+      });
+      total_resp_gr = responsableIds.size;
+    }
+    
+    // Autres statistiques
+    const total_leaders = await User.countDocuments({ qualification: 'Leader', ...churchFilter });
+    const total_leaders_all = await User.countDocuments({ qualification: { $in: ['Leader', 'Responsable réseau', '12', '144', '1728'] }, ...churchFilter });
+    const total_reguliers = await User.countDocuments({ qualification: 'Régulier', ...churchFilter });
+    const total_integration = await User.countDocuments({ qualification: 'En intégration', ...churchFilter });
+    const total_irreguliers = await User.countDocuments({ qualification: 'Irrégulier', ...churchFilter });
+    const total_gouvernance = await User.countDocuments({ qualification: 'Gouvernance', ...churchFilter });
+    const total_ecodim = await User.countDocuments({ qualification: 'Ecodim', ...churchFilter });
+    const total_resp_ecodim = await User.countDocuments({ qualification: 'Responsable ecodim', ...churchFilter });
+    
+    // Calcul des personnes isolées
+    let usersInGroups = [];
+    if (req.query.churchId) {
+      // Si on filtre par église, on doit d'abord récupérer les réseaux de cette église
+      const networksInChurch = await Network.find({ church: req.query.churchId }).select('_id');
+      const networkIds = networksInChurch.map(n => n._id);
+      usersInGroups = await Group.distinct('members', { network: { $in: networkIds } });
+    } else {
+      usersInGroups = await Group.distinct('members');
+    }
+    
     const total_personnes_isolees = await User.countDocuments({
       _id: { $nin: usersInGroups },
-      qualification: { $nin: ['Responsable réseau', 'Gouvernance', 'Ecodim', 'Responsable ecodim'] }
+      qualification: { $nin: ['Responsable réseau', 'Gouvernance', 'Ecodim', 'Responsable ecodim'] },
+      ...churchFilter
     });
-    const total_all = await User.countDocuments() - total_personnes_isolees;
+    
+    // Total général : tous les utilisateurs de l'église (ou toutes les églises)
+    const total_all = await User.countDocuments(churchFilter);
 
     res.json({
       total_gouvernance,
@@ -107,7 +154,6 @@ exports.getNetworksEvolution = async (req, res) => {
     }
 
     res.status(200).json({
-      success: true,
       data: evolution
     });
   } catch (error) {
@@ -167,7 +213,6 @@ exports.compareNetworksByYear = async (req, res) => {
     }
 
     res.status(200).json({
-      success: true,
       data: result
     });
   } catch (error) {

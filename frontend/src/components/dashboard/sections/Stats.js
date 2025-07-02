@@ -1,24 +1,23 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Box, Typography, Grid, CircularProgress, Paper } from '@mui/material';
 import { ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, Legend, LineChart, Line } from 'recharts';
 import ErrorMessage from '../../../components/ErrorMessage';
+import { apiService } from '../../../services/apiService';
+
+const COLORS = [
+    '#e6194b', '#3cb44b', '#ffe119', '#4363d8', '#f58231',
+    '#911eb4', '#46f0f0', '#f032e6', '#bcf60c', '#fabebe',
+    '#008080', '#e6beff', '#9a6324', '#fffac8', '#800000',
+    '#aaffc3', '#808000', '#ffd8b1', '#000075', '#808080',
+    '#ffffff', '#000000', '#a28ef5', '#ffb6b9', '#00c49f',
+    '#0088fe', '#ffc658', '#ff8042', '#7b68ee', '#f0e130'
+];
 
 const Stats = () => {
-
-    // Palette étendue pour des couleurs bien distinctes
-    const COLORS = [
-        '#e6194b', '#3cb44b', '#ffe119', '#4363d8', '#f58231',
-        '#911eb4', '#46f0f0', '#f032e6', '#bcf60c', '#fabebe',
-        '#008080', '#e6beff', '#9a6324', '#fffac8', '#800000',
-        '#aaffc3', '#808000', '#ffd8b1', '#000075', '#808080',
-        '#ffffff', '#000000', '#a28ef5', '#ffb6b9', '#00c49f',
-        '#0088fe', '#ffc658', '#ff8042', '#7b68ee', '#f0e130'
-    ];
-
     const [stats, setStats] = useState({});
     const [statsLoading, setStatsLoading] = useState(false);
     const [statsError, setStatsError] = useState(null);
-    const API_URL = process.env.REACT_APP_API_URL + '/api';
+    
     // États pour les stats graphiques
     const [networkStats, setNetworkStats] = useState([]); // Pour PieChart
     const [networkEvolution, setNetworkEvolution] = useState([]); // Pour LineChart
@@ -29,12 +28,8 @@ const Stats = () => {
     useEffect(() => {
         const fetchGlobalStats = async () => {
             try {
-                const token = localStorage.getItem('token');
-                const res = await fetch(`${API_URL}/stats`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                const data = await res.json();
-                if (res.ok) setStats(data);
+                const res = await apiService.stats.getOverview();
+                setStats(res.data?.data || res.data || {});
             } catch (err) {
                 // Optionnel : afficher une erreur si besoin
             } finally {
@@ -42,76 +37,49 @@ const Stats = () => {
             }
         };
         fetchGlobalStats();
-    }, [API_URL]);
-
+    }, []);
 
     const currentYear = new Date().getFullYear();
     const lastYear = currentYear - 1;
+
     // Fonction pour charger les statistiques
     const loadStats = async () => {
-        // ...
-        // Comparaison annuelle réseaux (année précédente vs année en cours)
-        try {
-            const token = localStorage.getItem('token');
-
-            const resCompare = await fetch(`${API_URL}/stats/networks/evolution/compare?years=${lastYear},${currentYear}`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            const dataCompare = await resCompare.json();
-            //console.log('Réponse brute comparaison annuelle:', dataCompare); // DEBUG
-            if (!dataCompare || !dataCompare.data) {
-                setStatsError('Erreur: Données de comparaison annuelle absentes ou invalides.');
-                setNetworkYearCompare([]);
-                return;
-            }
-            if (resCompare.ok && dataCompare.success) {
-                setNetworkYearCompare(dataCompare.data);
-            } else {
-                setStatsError('Erreur lors de la récupération des données de comparaison annuelle.');
-                setNetworkYearCompare([]);
-            }
-        } catch (err) {
-            // Optionnel : afficher une erreur
-        }
-
         try {
             setStatsLoading(true);
             setStatsError(null);
-            const token = localStorage.getItem('token');
+
             // 1. Stats réseaux (PieChart)
-            const resNetwork = await fetch(`${API_URL}/networks/stats`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            const dataNetwork = await resNetwork.json();
-            if (resNetwork.ok && dataNetwork.success) {
-                setNetworkStats(
-                    dataNetwork.data.map(n => ({ name: n.nom, value: n.memberCount || 0 }))
-                );
-            } else {
-                throw new Error(dataNetwork.message || 'Erreur stats réseaux');
-            }
+            const resNetwork = await apiService.stats.getNetworks();
+            const dataNetwork = resNetwork.data?.data || resNetwork.data || [];
+            setNetworkStats(
+                dataNetwork.map(n => ({ name: n.nom, value: n.memberCount || 0 }))
+            );
+
             // 2. Evolution membres réseaux (LineChart)
-            const resEvolution = await fetch(`${API_URL}/stats/networks/evolution`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            const dataEvolution = await resEvolution.json();
-            if (resEvolution.ok && dataEvolution.success) {
-                setNetworkEvolution(dataEvolution.data); // [{ month: '2025-01', Réseau1: 10, Réseau2: 20, ... }, ...]
-            }
+            const resEvolution = await apiService.stats.getNetworksEvolution();
+            const dataEvolution = resEvolution.data?.data || resEvolution.data || [];
+            setNetworkEvolution(dataEvolution);
+
             // 3. Fréquentation cultes (LineChart, 8 derniers dimanches)
-            // On demande uniquement les services du mois courant et des deux mois précédents
             const now = new Date();
-            const startMonth = new Date(now.getFullYear(), now.getMonth() - 2, 1); // Premier jour du mois il y a 2 mois
-            const endMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0); // Dernier jour du mois courant
+            const startMonth = new Date(now.getFullYear(), now.getMonth() - 2, 1);
+            const endMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
             const start = startMonth.toISOString().slice(0, 10);
             const end = endMonth.toISOString().slice(0, 10);
-            const resAttendance = await fetch(`${API_URL}/services/period?start=${start}&end=${end}`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            const dataAttendance = await resAttendance.json();
-            if (resAttendance.ok && dataAttendance.success) {
-                setServiceAttendance(dataAttendance.data);
+            
+            const resAttendance = await apiService.services.getAll({ start, end });
+            const dataAttendance = resAttendance.data?.data || resAttendance.data || [];
+            setServiceAttendance(dataAttendance);
+
+            // 4. Comparaison annuelle réseaux
+            try {
+                const resCompare = await apiService.stats.getNetworksComparison(`${lastYear},${currentYear}`);
+                const dataCompare = resCompare.data?.data || resCompare.data || [];
+                setNetworkYearCompare(dataCompare);
+            } catch (err) {
+                setNetworkYearCompare([]);
             }
+
             setStatsLoading(false);
         } catch (err) {
             setStatsError('Erreur lors du chargement des statistiques');
@@ -232,20 +200,20 @@ const Stats = () => {
                                                 <Typography sx={{ fontSize: 18, color: '#444', fontStyle: 'italic', textAlign: 'center' }}>
                                                     {"À la date du "}
                                                     <Box component="span" fontWeight="bold" color="primary.main">{`${jour} ${mois} ${annee}`}</Box>
-                                                    {", l’effectif total des membres des différents réseaux est de "}
+                                                    {", l'effectif total des membres des différents réseaux est de "}
                                                     <Box component="span" fontWeight="bold" color="primary.main">{total}</Box>
                                                     <Box component="span" fontWeight="bold" color="primary.main">{" personnes."}</Box>
                                                     {plusGrand && (
                                                         <>
                                                             {" Le plus grand réseau est "}
-                                                            <Box component="span" fontWeight="bold" color="primary.main">{` « ${plusGrand.name} »`}</Box>
+                                                            <Box component="span" fontWeight="bold" color="primary.main">{` « ${plusGrand.name} »`}</Box>
                                                             {" avec "}
                                                             <Box component="span" fontWeight="bold" color="primary.main">{plusGrand.value}</Box>
                                                             <Box component="span" fontWeight="bold" color="primary.main">{" membres"}</Box>
                                                             {second && (
                                                                 <>
                                                                     {", suivi du réseau "}
-                                                                    <Box component="span" fontWeight="bold" color="primary.main">{` « ${second.name} »`}</Box>
+                                                                    <Box component="span" fontWeight="bold" color="primary.main">{` « ${second.name} »`}</Box>
                                                                     {" ("}
                                                                     <Box component="span" fontWeight="bold" color="primary.main">{second.value}</Box>
                                                                     <Box component="span" fontWeight="bold" color="primary.main">{" membres"}</Box>
@@ -263,7 +231,7 @@ const Stats = () => {
                                                                     {"En "}
                                                                     <Box component="span" fontWeight="bold" color="primary.main">{`${mois} ${annee}`}</Box>
                                                                     {", le réseau "}
-                                                                    <Box component="span" fontWeight="bold" color="primary.main">{` « ${reseauxNouveaux[0].name} »`}</Box>
+                                                                    <Box component="span" fontWeight="bold" color="primary.main">{` « ${reseauxNouveaux[0].name} »`}</Box>
                                                                     {" a vu le jour."}
                                                                 </>
                                                             ) : (
@@ -271,7 +239,7 @@ const Stats = () => {
                                                                     {"En "}
                                                                     <Box component="span" fontWeight="bold" color="primary.main">{`${mois} ${annee}`}</Box>
                                                                     {", les réseaux "}
-                                                                    <Box component="span" fontWeight="bold" color="primary.main">{reseauxNouveaux.map(r => `« ${r.name} »`).join(', ')}</Box>
+                                                                    <Box component="span" fontWeight="bold" color="primary.main">{reseauxNouveaux.map(r => `« ${r.name} »`).join(', ')}</Box>
                                                                     {" ont vu le jour."}
                                                                 </>
                                                             )}
@@ -316,7 +284,7 @@ const Stats = () => {
                         <Grid data-aos="fade-up" item xs={12} md={8} sx={{ minWidth: 400, mt: 3 }}>
                             <Paper sx={{ p: 3, minHeight: 320, backgroundColor: '#f9f9f9' }}>
                                 <Typography variant="h6" gutterBottom sx={{ fontSize: 22 }}>
-                                    Comparaison de l’évolution des réseaux (3 derniers mois)
+                                    Comparaison de l'évolution des réseaux (3 derniers mois)
                                 </Typography>
                                 <ResponsiveContainer width="100%" height={400}>
                                     <BarChart data={(() => {

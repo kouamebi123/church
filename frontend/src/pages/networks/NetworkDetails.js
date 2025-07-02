@@ -1,10 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import DeleteConfirmDialog from '../../components/DeleteConfirmDialog';
-import axios from 'axios';
 import { useParams } from 'react-router-dom';
-
-import { useSelector } from 'react-redux';
-import Loading from '../../components/Loading';
 import {
   Box,
   Container,
@@ -34,12 +29,19 @@ import {
   Edit as EditIcon,
   Delete as DeleteIcon,
   Person as PersonIcon,
-  Refresh as RefreshIcon
+  Refresh as RefreshIcon,
+  ExpandMore as ExpandMoreIcon,
+  Group as GroupIcon,
+  NetworkCheck as NetworkCheckIcon
 } from '@mui/icons-material';
 import Navbar from '../../components/Navbar';
+import Loading from '../../components/Loading';
+import ErrorMessage from '../../components/ErrorMessage';
+import DeleteConfirmDialog from '../../components/DeleteConfirmDialog';
 import { GENRE_OPTIONS, TRANCHE_AGE_OPTIONS, SITUATION_MATRIMONIALE_OPTIONS, NIVEAU_EDUCATION_OPTIONS, QUALIFICATION_OPTIONS } from '../../constants/enums';
 import { COUNTRIES } from '../../constants/countries';
-import ErrorMessage from '../../components/ErrorMessage';
+import { apiService } from '../../services/apiService';
+import { useAuth } from '../../hooks/useAuth';
 
 const StyledCard = styled(Card)(({ theme }) => ({
   height: '100%',
@@ -50,10 +52,6 @@ const StyledCard = styled(Card)(({ theme }) => ({
     transform: 'translateY(-4px)'
   }
 }));
-
-
-
-
 
 const StatCard = styled(Paper)(({ theme }) => ({
   padding: theme.spacing(2),
@@ -68,32 +66,36 @@ const StatCard = styled(Paper)(({ theme }) => ({
 }));
 
 function NetworkDetails() {
+  const { user, isAuthenticated } = useAuth();
+  const { id: networkId } = useParams();
+  
   // Hooks pour charger dynamiquement les églises et départements
   const [churches, setChurches] = useState([]);
   const [departments, setDepartments] = useState([]);
   const [error, setError] = useState(null);
 
-  const API_URL = process.env.REACT_APP_API_URL + '/api';
-
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    axios.get(`${API_URL}/churches`, {
-      headers: { Authorization: `Bearer ${token}` }
-    })
-      .then(res => setChurches(res.data.data))
-      .catch(() => setChurches([]));
-    axios.get(`${API_URL}/departments`, {
-      headers: { Authorization: `Bearer ${token}` }
-    })
-      .then(res => setDepartments(res.data.data))
-      .catch(() => setDepartments([]));
+    // Utiliser le service API centralisé
+    Promise.all([
+      apiService.churches.getAll(),
+      apiService.departments.getAll()
+    ])
+      .then(([churchesRes, departmentsRes]) => {
+        // Gérer la structure de réponse de l'API
+        const churchesData = churchesRes.data?.data || churchesRes.data || [];
+        const departmentsData = departmentsRes.data?.data || departmentsRes.data || [];
+        setChurches(Array.isArray(churchesData) ? churchesData : []);
+        setDepartments(Array.isArray(departmentsData) ? departmentsData : []);
+      })
+      .catch(() => {
+        setChurches([]);
+        setDepartments([]);
+      });
   }, []);
 
   // ...
   const [selectedResponsable1, setSelectedResponsable1] = useState('');
   const [selectedResponsable2, setSelectedResponsable2] = useState('');
-
-  const { user } = useSelector(state => state.auth);
 
   // États pour les modales
   const [addGrModal, setAddGrModal] = useState(false);
@@ -153,31 +155,35 @@ function NetworkDetails() {
   });
   const [loading, setLoading] = useState(true);
 
-
-  // Récupération dynamique de l'ID du réseau depuis l'URL
-  const { id: networkId } = useParams();
-
   // Déclaration de fetchData accessible à tous les handlers
   const fetchData = async () => {
-    const token = localStorage.getItem('token');
-    //setLoading(true);
-
     try {
-      // Adapte les URLs à ton backend
-      const reseauRes = await axios.get(`${API_URL}/networks/${networkId}`);
-      const statsRes = await axios.get(`${API_URL}/networks/${networkId}/stats`);
-      const grsRes = await axios.get(`${API_URL}/networks/${networkId}/grs`);
-      const membersRes = await axios.get(`${API_URL}/networks/${networkId}/members`);
-      const availableUsersRes = await axios.get(`${API_URL}/users/available`);
+      // Utiliser le service API centralisé
+      const [reseauRes, statsRes, grsRes, membersRes, availableUsersRes] = await Promise.all([
+        apiService.networks.getById(networkId),
+        apiService.networks.getStats(networkId),
+        apiService.networks.getGroups(networkId),
+        apiService.networks.getMembers(networkId),
+        apiService.users.getAvailable()
+      ]);
+
+      // Gérer la structure de réponse de l'API
+      const reseauData = reseauRes.data?.data || reseauRes.data || {};
+      const statsData = statsRes.data?.data || statsRes.data || {};
+      const grsData = grsRes.data?.data || grsRes.data || [];
+      const membersData = membersRes.data?.data || membersRes.data || [];
+      const availableUsersData = availableUsersRes.data?.data || availableUsersRes.data || [];
+
       setNetworkData({
-        reseau: reseauRes.data.data,
-        stats: statsRes.data.data || {},
-        grs: Array.isArray(grsRes.data.data) ? grsRes.data.data : [],
-        members: Array.isArray(membersRes.data.data) ? membersRes.data.data : [],
-        available_users: Array.isArray(availableUsersRes.data.data) ? availableUsersRes.data.data : []
+        reseau: reseauData,
+        stats: statsData,
+        grs: Array.isArray(grsData) ? grsData : [],
+        members: Array.isArray(membersData) ? membersData : [],
+        available_users: Array.isArray(availableUsersData) ? availableUsersData : []
       });
     } catch (err) {
       setError("Erreur lors du chargement des données réseau");
+      console.error('Erreur fetchData:', err);
     } finally {
       setLoading(false);
     }
@@ -190,10 +196,7 @@ function NetworkDetails() {
   // Gestionnaires d'événements
   const handleEditGr = async (data) => {
     try {
-      const token = localStorage.getItem('token');
-      await axios.put(`${API_URL}/groups/${data._id}`, data, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      await apiService.groups.update(data._id, data);
       setEditGrModal(false);
       setSelectedGr(null);
       setSnackbar({ open: true, message: 'GR modifié avec succès', severity: 'success' });
@@ -215,10 +218,7 @@ function NetworkDetails() {
 
   const handleConfirmDeleteGr = async () => {
     try {
-      const token = localStorage.getItem('token');
-      await axios.delete(`${API_URL}/groups/${grToDelete}`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      await apiService.groups.delete(grToDelete);
       await fetchData();
       setSnackbar({ open: true, message: 'GR supprimé avec succès', severity: 'success' });
     } catch (error) {
@@ -236,7 +236,6 @@ function NetworkDetails() {
 
   const handleAddGr = async (data) => {
     try {
-      const token = localStorage.getItem('token');
       const payload = {
         ...data,
         network: networkId,
@@ -245,11 +244,7 @@ function NetworkDetails() {
       if (selectedResponsable2) {
         payload.responsable2 = selectedResponsable2;
       }
-      await axios.post(
-        `${API_URL}/groups`,
-        payload,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      await apiService.groups.create(payload);
       setAddGrModal(false);
       setSnackbar({ open: true, message: 'GR ajouté avec succès', severity: 'success' });
       // Refresh données réseau
@@ -263,7 +258,10 @@ function NetworkDetails() {
 
   const handleAddMember = async (data) => {
     try {
-      const token = localStorage.getItem('token');
+        console.log('handleAddMember appelé avec selectedGr:', selectedGr);
+        console.log('selectedGr.id:', selectedGr?.id);
+        console.log('selectedGr._id:', selectedGr?._id);
+        
       if (newMemberMode) {
         // 1. Créer le nouvel utilisateur
         const newMemberData = {
@@ -277,25 +275,15 @@ function NetworkDetails() {
           }
         });
         console.log(newMemberData);
-        const userRes = await axios.post(
-          `${API_URL}/users`,
-          newMemberData,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-        const newUserId = userRes.data.data._id;
+        const userRes = await apiService.users.create(newMemberData);
+        const newUserId = userRes.data?.data?._id || userRes.data._id;
+            console.log('Nouvel utilisateur créé avec ID:', newUserId);
         // 2. Ajouter ce nouvel utilisateur au groupe
-        await axios.post(
-          `${API_URL}/groups/${selectedGr._id}/members`,
-          { userId: newUserId },
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
+            await apiService.groups.addMember(selectedGr.id, newUserId);
       } else {
         // Ajouter un membre existant au groupe
-        await axios.post(
-          `${API_URL}/groups/${selectedGr._id}/members`,
-          { userId: selectedMember },
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
+            console.log('Ajout du membre existant:', selectedMember);
+            await apiService.groups.addMember(selectedGr.id, selectedMember);
       }
       setAddMemberModal(false);
       setNewMemberMode(false);
@@ -321,9 +309,8 @@ function NetworkDetails() {
       });
       setSnackbar({ open: true, message: 'Membre ajouté avec succès', severity: 'success' });
       await fetchData();
-      // Refresh données réseau
-      await fetchData()
     } catch (error) {
+        console.error('Erreur dans handleAddMember:', error);
       setSnackbar({ open: true, message: "Erreur lors de l'ajout du membre", severity: 'error' });
     }
   };
@@ -346,7 +333,7 @@ function NetworkDetails() {
         }
         return obj;
       }, {});
-      await axios.put(`${API_URL}/users/${userId}`, filteredData);
+      await apiService.users.update(userId, filteredData);
       setEditMemberModal(false);
       setEditMemberForm({
         username: '',
@@ -386,9 +373,8 @@ function NetworkDetails() {
 
   const handleConfirmDeleteMember = async () => {
     const { grId, userId } = memberToDelete;
-    const token = localStorage.getItem('token');
     try {
-      await axios.delete(`${API_URL}/groups/${grId}/members/${userId}`, { data: { grId }, headers: { Authorization: `Bearer ${token}` } });
+      await apiService.groups.removeMember(grId, userId);
       setSnackbar({ open: true, message: 'Membre supprimé avec succès', severity: 'success' });
       await fetchData();
     } catch (error) {
@@ -406,6 +392,17 @@ function NetworkDetails() {
 
   if (loading) return <Loading titre="Chargement des données du réseau" />;
   if (error) return <ErrorMessage error={error} />;
+
+  // Vérification de l'authentification
+  if (!isAuthenticated) {
+    return (
+      <Box sx={{ minHeight: '100vh', bgcolor: 'background.default', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <Typography variant="h6" color="error">
+          Vous devez être connecté pour accéder à cette page.
+        </Typography>
+      </Box>
+    );
+  }
 
   return (
     <Box sx={{ minHeight: '100vh', bgcolor: 'background.default' }}>
@@ -494,7 +491,7 @@ function NetworkDetails() {
         <Box data-aos="fade-up" sx={{ mb: 4 }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
             <Typography variant="h5">Groupes de Réveil</Typography>
-            {(user?.role === 'admin' || user?.role === 'superviseur') && (
+            {(user?.role === 'admin' || user?.role === 'super-admin' || user?.role === 'superviseur') && (
               <Button
                 variant="contained"
                 startIcon={<AddIcon />}
@@ -524,7 +521,7 @@ function NetworkDetails() {
                         GR {gr.responsable1?.username?.split(' ')[0]}
                         {gr.responsable2?.username && ` & ${gr.responsable2?.username?.split(' ')[0]}`}
                       </Typography>
-                      {(user?.role === 'admin' || user?.role === 'superviseur') && (
+                      {(user?.role === 'admin' || user?.role === 'super-admin' || user?.role === 'superviseur') && (
                         <Box>
                           <IconButton
                             color="primary"
@@ -573,7 +570,7 @@ function NetworkDetails() {
                         <Typography>
                           {member.username} ({member.qualification})
                         </Typography>
-                        {(user?.role === 'admin' || user?.role === 'superviseur') && (
+                        {(user?.role === 'admin' || user?.role === 'superviseur' || user?.role === 'super-admin') && (
                           <Box>
                             <IconButton
                               size="small"
@@ -603,7 +600,7 @@ function NetworkDetails() {
                             </IconButton>
                             <IconButton
                               size="small"
-                              onClick={() => handleRemoveMember(gr._id, member._id)}
+                              onClick={() => handleRemoveMember(gr.id, member._id)}
                             >
                               <DeleteIcon fontSize="small" />
                             </IconButton>
@@ -613,7 +610,7 @@ function NetworkDetails() {
                     ))}
                   </CardContent>
                   <CardActions sx={{ mt: 'auto', p: 2 }}>
-                    {(user?.role === 'admin' || user?.role === 'superviseur') && (
+                    {(user?.role === 'admin' || user?.role === 'superviseur' || user?.role === 'super-admin') && (
                       <Button
                         fullWidth
                         variant="contained"
@@ -947,13 +944,18 @@ function NetworkDetails() {
           onEnter={async () => {
             if (selectedGr) {
               try {
-                const token = localStorage.getItem('token');
-                const res = await axios.get(`${API_URL}/groups/${selectedGr.id}`, {
-                  headers: { Authorization: `Bearer ${token}` }
-                });
-                const group = res.data.data;
-                setSelectedResponsable1(group.responsable1 ? group.responsable1._id : '');
-                setSelectedResponsable2(group.responsable2 ? group.responsable2._id : '');
+                const res = await apiService.groups.getById(selectedGr.id);
+                const group = res.data?.data || res.data || {};
+                setSelectedResponsable1(
+                  group.responsable1
+                    ? (typeof group.responsable1 === 'object' ? group.responsable1._id : group.responsable1)
+                    : ''
+                );
+                setSelectedResponsable2(
+                  group.responsable2
+                    ? (typeof group.responsable2 === 'object' ? group.responsable2._id : group.responsable2)
+                    : ''
+                );
               } catch (e) {
                 setSelectedResponsable1('');
                 setSelectedResponsable2('');
@@ -1001,7 +1003,7 @@ function NetworkDetails() {
             <Button
               variant="contained"
               onClick={() => handleEditGr({
-                _id: selectedGr._id,
+                id: selectedGr.id,
                 network: selectedGr.network?._id || selectedGr.network,
                 responsable1: selectedResponsable1,
                 ...(selectedResponsable2 ? { responsable2: selectedResponsable2 } : {}) // N'inclure que si non vide

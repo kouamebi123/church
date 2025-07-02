@@ -54,6 +54,22 @@ const serviceSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',
         required: true
+    },
+    invitationYoutube: {
+        type: Number,
+        default: 0
+    },
+    invitationTiktok: {
+        type: Number,
+        default: 0
+    },
+    invitationInstagram: {
+        type: Number,
+        default: 0
+    },
+    invitationPhysique: {
+        type: Number,
+        default: 0
     }
 }, {
     timestamps: true,

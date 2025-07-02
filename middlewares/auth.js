@@ -17,10 +17,18 @@ exports.protect = async (req, res, next) => {
         }
 
         // 2. Vérifier la validité du token
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        let decoded;
+        try {
+            decoded = jwt.verify(token, process.env.JWT_SECRET);
+        } catch (jwtError) {
+            return res.status(401).json({ 
+                success: false, 
+                message: 'Token invalide ou expiré' 
+            });
+        }
 
         // 3. Vérifier si l'utilisateur existe toujours
-        const user = await User.findById(decoded.id);
+        const user = await User.findById(decoded.id).select('-password');
         if (!user) {
             return res.status(401).json({ 
                 success: false, 
@@ -32,6 +40,7 @@ exports.protect = async (req, res, next) => {
         req.user = user;
         next();
     } catch (error) {
+        console.error('Erreur d\'authentification:', error);
         res.status(401).json({ 
             success: false, 
             message: 'Non autorisé à accéder à cette ressource' 
@@ -41,6 +50,16 @@ exports.protect = async (req, res, next) => {
 
 exports.authorize = (...roles) => {
     return (req, res, next) => {
+        if (!req.user) {
+            return res.status(401).json({
+                success: false,
+                message: 'Utilisateur non authentifié'
+            });
+        }
+        // super-admin a tous les droits
+        if (req.user.role === 'super-admin') {
+            return next();
+        }
         if (!roles.includes(req.user.role)) {
             return res.status(403).json({
                 success: false,
